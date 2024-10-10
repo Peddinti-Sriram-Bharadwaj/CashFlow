@@ -6,7 +6,7 @@
 #include <string.h>
 #include "../global.c"
 
-struct CustomerLogin{
+struct ManagerLogin{
   char username[20];
   char password[20];
 };
@@ -19,21 +19,21 @@ void remove_newline(char *str) {
 }
 
 int main(){
-  printf("please enter the name of the customer to be added\n");
+  printf("please enter the name of the Manager to be added\n");
   printf("Enter the username\n");
   char username[20], password[20];
   fgets(username,20,stdin);
   remove_newline(username);
   
-  printf("Ask the customer to create password\n");
+  printf("Ask the Manager to create password\n");
   fgets(password,20,stdin); 
   remove_newline(password);
-  struct CustomerLogin e1;
+  struct ManagerLogin e1;
   strcpy(e1.username, username);
   strcpy(e1.password, password);
-  char EmployeeLoginsPath[256];
-  snprintf(EmployeeLoginsPath,sizeof(EmployeeLoginsPath),"%s%s", basePath, "/customer/customerlogins.txt"); 
-  int fd = open(EmployeeLoginsPath, O_RDWR | O_APPEND | O_CREAT, 0644);
+  char ManagerLoginsPath[256];
+  snprintf(ManagerLoginsPath,sizeof(ManagerLoginsPath),"%s%s", basePath, "/customer/customerlogins.txt"); 
+  int fd = open(ManagerLoginsPath, O_RDWR | O_APPEND | O_CREAT, 0644);
   if(fd == -1) printf("not opened");
   write(fd, &e1, sizeof(e1));
 
@@ -42,3 +42,4 @@ int main(){
   
   return 0;
 }
+

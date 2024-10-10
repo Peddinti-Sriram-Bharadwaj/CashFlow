@@ -33,7 +33,7 @@ int main(){
     printf("Enter your username\n");
     fgets(username,20,stdin);
     remove_newline(username);
-    
+     
 
     while(read(fd, &e, sizeof(e)) > 0){
       if(strcmp(e.username, username) != 0){
