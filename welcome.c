@@ -17,18 +17,22 @@ int main(){
     switch(option){
         case 1:
             printf("Admin\n");
+            execvp("./admin/login.out", NULL);
             break;
         case 2:
             printf("Manager\n");
+            execvp("./manager/login.out", NULL);
             break;
         case 3:
             printf("Employee\n");
+            execvp("./employee/login.out", NULL);
             break;
         case 4:
             printf("Customer\n");
+            execvp("./customer/login.out", NULL);
             break;
         default:
-            printf("Invalid option\n");
+            printf("Invalid option\n", NULL);
     }
 
 }
