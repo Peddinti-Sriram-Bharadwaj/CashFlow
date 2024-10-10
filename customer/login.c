@@ -4,42 +4,61 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
+#include "../global.c"
 
 struct EmployeeLogin{
   char username[20];
   char password[20];
 };
 
+void remove_newline(char *str) {
+    size_t len = strlen(str);
+    if (len > 0 && str[len - 1] == '\n') {
+        str[len - 1] = '\0'; // Replace newline with null terminator
+    }
+}
+
 int main(){
-    printf("welcome to Cashflow dear user\n");
-    printf("please login to proceed further\n");
-    printf("Enter the username\n");
-    char username[50];
-    scanf("%s", username);
-    printf("Enter the password\n");
-    char password[50];
-    scanf("%s", password);
-    int fd = open("./customer/customerlogins.txt", O_RDONLY, 0644);
-    printf("%d\n", fd);
-    if(fd == -1) printf("not opened");
+    char EmployeeLoginsPath[256];
+    snprintf(EmployeeLoginsPath, sizeof(EmployeeLoginsPath), "%s%s", basePath, "/customer/customerlogins.txt"); 
+
+    int fd = open(EmployeeLoginsPath, O_RDONLY, 0644);
     struct EmployeeLogin e;
     int found = 0;
+    char username[50];
+    char password[50];
+
+    printf("welcome to cashflow dear customer\n");
+    printf("Please login below to proceed further\n");
+    printf("Enter your username\n");
+    fgets(username,20,stdin);
+    remove_newline(username);
+    
 
     while(read(fd, &e, sizeof(e)) > 0){
       if(strcmp(e.username, username) != 0){
         continue;
       }
       found = 1;
-      if(strcmp(e.password,password) == 0){
-      printf("login successful\n");
-      }
-      else{
-        printf("invalid password\n");
-      
-      }
+      break;
     }
 
-    if(!found) printf("user doesnt exist\n");
+    if(!found){
+      printf("user doesnt exist\n");
+      return 0;
+    }
+
+    printf("Enter the password\n");
+    fgets(password,20,stdin);
+    remove_newline(password);
+
+    if(strcmp(e.password,password) == 0){
+      printf("login successful\n");
+      }
+    else{
+      printf("invalid password\n");     
+      }
+
     close(fd);
     return 0;
 }
