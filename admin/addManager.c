@@ -4,11 +4,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <string.h>
+#include <sodium.h> // Include libsodium header
 #include "../global.c"
 
 struct ManagerLogin{
   char username[20];
-  char password[20];
+  char hashed_password[crypto_pwhash_STRBYTES]; // Store the hashed password
 };
 
 void remove_newline(char *str) {
@@ -19,27 +20,46 @@ void remove_newline(char *str) {
 }
 
 int main(){
-  printf("please enter the name of the Manager to be added\n");
-  printf("Enter the username\n");
-  char username[20], password[20];
-  fgets(username,20,stdin);
-  remove_newline(username);
-  
-  printf("Ask the Manager to create password\n");
-  fgets(password,20,stdin); 
-  remove_newline(password);
-  struct ManagerLogin e1;
-  strcpy(e1.username, username);
-  strcpy(e1.password, password);
-  char ManagerLoginsPath[256];
-  snprintf(ManagerLoginsPath,sizeof(ManagerLoginsPath),"%s%s", basePath, "/customer/customerlogins.txt"); 
-  int fd = open(ManagerLoginsPath, O_RDWR | O_APPEND | O_CREAT, 0644);
-  if(fd == -1) printf("not opened");
-  write(fd, &e1, sizeof(e1));
+    // Initialize libsodium
+    if (sodium_init() < 0) {
+        printf("libsodium initialization failed\n");
+        return 1;
+    }
 
-  close(fd);
-
+    printf("Please enter the name of the Manager to be added\n");
+    printf("Enter the username\n");
+    char username[20], password[20];
+    fgets(username, 20, stdin);
+    remove_newline(username);
   
-  return 0;
+    printf("Ask the Manager to create password\n");
+    fgets(password, 20, stdin); 
+    remove_newline(password);
+
+    // Hash the password
+    struct ManagerLogin e1;
+    if (crypto_pwhash_str(e1.hashed_password, password, strlen(password), crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
+        printf("Password hashing failed\n");
+        return 1;
+    }
+
+    // Store the username and hashed password
+    strncpy(e1.username, username, sizeof(e1.username) - 1); // Ensure null-termination
+
+    // Write to the manager login file
+    char ManagerLoginsPath[256];
+    snprintf(ManagerLoginsPath, sizeof(ManagerLoginsPath), "%s%s", basePath, "/Manager/managerlogins.txt"); 
+    int fd = open(ManagerLoginsPath, O_RDWR | O_APPEND | O_CREAT, 0644);
+    if (fd == -1) {
+        printf("Failed to open the file\n");
+        return 1;
+    }
+
+    // Write the struct with username and hashed password to the file
+    write(fd, &e1, sizeof(e1));
+    close(fd);
+
+    printf("Manager account created successfully\n");
+
+    return 0;
 }
-

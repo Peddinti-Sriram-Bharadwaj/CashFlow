@@ -4,11 +4,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <string.h>
+#include <sodium.h> // Include libsodium header
 #include "../global.c"
 
-struct EmployeeLogin{
-  char username[20];
-  char password[20];
+struct EmployeeLogin {
+    char username[20];
+    char hashed_password[crypto_pwhash_STRBYTES]; // Store the hashed password
 };
 
 void remove_newline(char *str) {
@@ -18,28 +19,44 @@ void remove_newline(char *str) {
     }
 }
 
-int main(){
-  printf("please enter the name of the Employee to be added\n");
-  printf("Enter the username\n");
-  char username[20], password[20];
-  fgets(username,20,stdin);
-  remove_newline(username);
-  
-  printf("Ask the employee to create password\n");
-  fgets(password,20,stdin); 
-  remove_newline(password);
-  struct EmployeeLogin e1;
-  strcpy(e1.username, username);
-  strcpy(e1.password, password);
-  char EmployeeLoginsPath[256];
-  snprintf(EmployeeLoginsPath,sizeof(EmployeeLoginsPath),"%s%s", basePath, "/employee/employeelogins.txt"); 
-  int fd = open(EmployeeLoginsPath, O_RDWR | O_APPEND | O_CREAT, 0644);
-  if(fd == -1) printf("not opened");
-  write(fd, &e1, sizeof(e1));
+int main() {
+    // Initialize libsodium
+    if (sodium_init() < 0) {
+        return 1; // Panic! The library couldn't be initialized
+    }
 
-  close(fd);
+    printf("Please enter the name of the Employee to be added\n");
+    printf("Enter the username\n");
+    char username[20], password[20];
+    fgets(username, sizeof(username), stdin);
+    remove_newline(username);
 
-  
-  return 0;
+    printf("Ask the employee to create a password\n");
+    fgets(password, sizeof(password), stdin);
+    remove_newline(password);
+
+    struct EmployeeLogin e1;
+    strcpy(e1.username, username);
+
+    // Hash the password
+    if (crypto_pwhash_str(e1.hashed_password, password, strlen(password), crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
+        printf("Error hashing the password\n");
+        return 1;
+    }
+
+    char EmployeeLoginsPath[256];
+    snprintf(EmployeeLoginsPath, sizeof(EmployeeLoginsPath), "%s%s", basePath, "/employee/employeelogins.txt");
+
+    int fd = open(EmployeeLoginsPath, O_RDWR | O_APPEND | O_CREAT, 0644);
+    if (fd == -1) {
+        printf("Failed to open the file\n");
+        return 1;
+    }
+
+    write(fd, &e1, sizeof(e1));
+    close(fd);
+
+    printf("Employee added successfully\n");
+
+    return 0;
 }
-

@@ -4,11 +4,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <string.h>
+#include <sodium.h> // Include libsodium header
 #include "../global.c"
 
-struct CustomerLogin{
-  char username[20];
-  char password[20];
+struct CustomerLogin {
+    char username[20];
+    char hashed_password[crypto_pwhash_STRBYTES]; // Store the hashed password
 };
 
 void remove_newline(char *str) {
@@ -18,27 +19,41 @@ void remove_newline(char *str) {
     }
 }
 
-int main(){
-  printf("please enter the name of the customer to be added\n");
-  printf("Enter the username\n");
-  char username[20], password[20];
-  fgets(username,20,stdin);
-  remove_newline(username);
-  
-  printf("Ask the customer to create password\n");
-  fgets(password,20,stdin); 
-  remove_newline(password);
-  struct CustomerLogin e1;
-  strcpy(e1.username, username);
-  strcpy(e1.password, password);
-  char EmployeeLoginsPath[256];
-  snprintf(EmployeeLoginsPath,sizeof(EmployeeLoginsPath),"%s%s", basePath, "/customer/customerlogins.txt"); 
-  int fd = open(EmployeeLoginsPath, O_RDWR | O_APPEND | O_CREAT, 0644);
-  if(fd == -1) printf("not opened");
-  write(fd, &e1, sizeof(e1));
+int main() {
+    // Initialize libsodium
+    if (sodium_init() < 0) {
+        return 1; // Panic! The library couldn't be initialized
+    }
 
-  close(fd);
+    char EmployeeLoginsPath[256];
+    snprintf(EmployeeLoginsPath, sizeof(EmployeeLoginsPath), "%s%s", basePath, "/customer/customerlogins.txt");
 
-  
-  return 0;
+    int fd = open(EmployeeLoginsPath, O_WRONLY | O_CREAT | O_APPEND, 0644);
+    struct CustomerLogin e;
+    char username[20], password[20];
+
+    printf("Welcome to cashflow, dear customer\n");
+    printf("Please create a new account\n");
+    printf("Enter your username\n");
+    fgets(username, sizeof(username), stdin);
+    remove_newline(username);
+
+    printf("Enter your password\n");
+    fgets(password, sizeof(password), stdin);
+    remove_newline(password);
+
+    // Hash the password
+    if (crypto_pwhash_str(e.hashed_password, password, strlen(password), crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
+        printf("Password hashing failed\n");
+        close(fd);
+        return 1;
+    }
+
+    // Store the username and hashed password in the file
+    strncpy(e.username, username, sizeof(e.username) - 1); // Ensure null-termination
+    write(fd, &e, sizeof(e));
+
+    printf("Account created successfully\n");
+    close(fd);
+    return 0;
 }
