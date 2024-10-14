@@ -25,10 +25,13 @@ int main() {
         return 1; // Panic! The library couldn't be initialized
     }
 
-    char EmployeeLoginsPath[256];
-    snprintf(EmployeeLoginsPath, sizeof(EmployeeLoginsPath), "%s%s", basePath, "/customer/customerlogins.txt");
+    char CustomerLoginsPath[256];
+    snprintf(CustomerLoginsPath, sizeof(CustomerLoginsPath), "%s%s", basePath, "/customer/customerlogins.txt");
 
-    int fd = open(EmployeeLoginsPath, O_RDONLY);
+    char CustomerActionsPath[256];
+    snprintf(CustomerActionsPath, sizeof(CustomerActionsPath), "%s%s", basePath, "/customer/customer.out");
+
+    int fd = open(CustomerLoginsPath, O_RDONLY);
     struct CustomerLogin e;
     int found = 0;
     char username[20], password[20];
@@ -62,6 +65,7 @@ int main() {
         printf("Invalid password\n");
     } else {
         printf("Login successful\n");
+        execvp(CustomerActionsPath, NULL);
     }
 
     close(fd);

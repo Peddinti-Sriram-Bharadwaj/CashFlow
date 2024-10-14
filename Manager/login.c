@@ -28,6 +28,9 @@ int main() {
     char ManagerLoginsPath[256];
     snprintf(ManagerLoginsPath, sizeof(ManagerLoginsPath), "%s%s", basePath, "/manager/managerlogins.txt");
 
+    char ManagerActionsPath[256];
+    snprintf(ManagerActionsPath, sizeof(ManagerActionsPath), "%s%s", basePath, "/manager/manager.out");
+
     int fd;
     struct AdminLogin a;
     int found = 0;
@@ -70,6 +73,7 @@ int main() {
         printf("Invalid password\n");
     } else {
         printf("Login successful\n");
+        execvp(ManagerActionsPath, NULL);
     }
 
     close(fd);

@@ -28,6 +28,9 @@ int main() {
     char EmployeeLoginsPath[256];
     snprintf(EmployeeLoginsPath, sizeof(EmployeeLoginsPath), "%s%s", basePath, "/employee/employeelogins.txt");
 
+    char EmployeeActionsPath[256];
+    snprintf(EmployeeActionsPath, sizeof(EmployeeActionsPath), "%s%s", basePath, "/employee/employee.out");
+
     int fd = open(EmployeeLoginsPath, O_RDONLY);
     struct EmployeeLogin e;
     int found = 0;
@@ -62,6 +65,9 @@ int main() {
         printf("Invalid password\n");
     } else {
         printf("Login successful\n");
+        // use exec calls to execute employee.c file
+        execvp(EmployeeActionsPath, NULL);
+
     }
 
     close(fd);

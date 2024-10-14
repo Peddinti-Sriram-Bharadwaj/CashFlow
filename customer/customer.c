@@ -6,17 +6,17 @@
 
 int main(){
     printf("welcome to Cashflow dear user\n");
-    printf("please select one of the below options to proceed further");
-    printf("View account balance -1");
-    printf("Deposit money -2");
-    printf("Withdraw money -3");
-    printf("Transfer funds -4");
-    printf("Apply for a loan -5");
-    printf("Change password -6");
-    printf("Adding feedback -7");
-    printf("View Transaction History -8");
-    printf("Logout -9");
-    printf("Exit -10");
+    printf("please select one of the below options to proceed further\n");
+    printf("View account balance -1\n");
+    printf("Deposit money -2\n");
+    printf("Withdraw money -3\n");
+    printf("Transfer funds -4\n");
+    printf("Apply for a loan -5\n");
+    printf("Change password -6\n");
+    printf("Adding feedback -7\n");
+    printf("View Transaction History -8\n");
+    printf("Logout -9\n");
+    printf("Exit -10\n");
 
     int option;
     scanf("%d", &option);
