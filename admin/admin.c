@@ -3,8 +3,14 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <string.h>
+#include <sodium.h> // Include libsodium header
+#include "../global.c"
 
 int main(){
+  char ExitPath[256];
+    snprintf(ExitPath, sizeof(ExitPath), "%s%s", basePath, "/welcome.out");
+
   printf("Welcome to the admin dashboard\n");
   printf("Please choose one of the options to proceed further\n");
   printf("add new bank employee -1\n");
@@ -35,6 +41,7 @@ int main(){
       break;
     case 6:
       printf("Exit\n");
+      execvp(ExitPath, NULL); 
       break;
     }
 

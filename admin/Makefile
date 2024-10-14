@@ -5,7 +5,7 @@ login.out: login.c
 
 
 admin.out: admin.c
-	gcc admin.c -o admin.out
+	gcc admin.c -o admin.out -I/opt/homebrew/Cellar/libsodium/1.0.20/include -L/opt/homebrew/Cellar/libsodium/1.0.20/lib -lsodium
 
 addAdmin.out: addAdmin.c
 	gcc -o addAdmin.out addAdmin.c -I/opt/homebrew/Cellar/libsodium/1.0.20/include -L/opt/homebrew/Cellar/libsodium/1.0.20/lib -lsodium

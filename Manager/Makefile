@@ -5,4 +5,4 @@ login.out: login.c
 
 
 manager.out: manager.c
-	gcc manager.c -o manager.out
+	gcc manager.c -o manager.out -I/opt/homebrew/Cellar/libsodium/1.0.20/include -L/opt/homebrew/Cellar/libsodium/1.0.20/lib -lsodium

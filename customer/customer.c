@@ -3,8 +3,16 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sodium.h> // Include libsodium header
+#include "../global.c"
+
+
 
 int main(){
+    char ExitPath[256];
+    snprintf(ExitPath, sizeof(ExitPath), "%s%s", basePath, "/welcome.out");
+
+
     printf("welcome to Cashflow dear user\n");
     printf("please select one of the below options to proceed further\n");
     printf("View account balance -1\n");
@@ -51,6 +59,7 @@ int main(){
             break;
         case 10:
             printf("Exit\n");
+            execvp(ExitPath, NULL);
             break;
         default:
             printf("Invalid option\n");

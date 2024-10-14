@@ -3,18 +3,25 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <string.h>
+#include <sodium.h> // Include libsodium header
+#include "../global.c"
 
 int main(){
+  char ExitPath[256];
+    snprintf(ExitPath, sizeof(ExitPath), "%s%s", basePath, "/welcome.out");
+
   printf("Welcome to the workspace dear employee\n");
   printf("Select one of the following options to proceed further\n");
   printf("Add new customer -1\n");
   printf("Modify customer details -2\n");
   printf("Process loan applications -3\n");
   printf("Approve/reject loan applications -4\n");
-  printf("View customer transactions -5\n");
-  printf("Change password -6\n");
-  printf("Logout -7\n");
-  printf("Exit -8\n");
+  printf("View assigned loan applications -5\n");
+  printf("View customer transactions -6\n");
+  printf("Change password -7\n");
+  printf("Logout -8\n");
+  printf("Exit -9\n");
 
   int option;
   scanf("%d", &option);
@@ -45,6 +52,7 @@ case 3:
       break;
     case 9:
       printf("Exit\n");
+      execvp(ExitPath, NULL);
       break;
     default:
       printf("Invalid option\n");

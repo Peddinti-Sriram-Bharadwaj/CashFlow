@@ -11,4 +11,4 @@ login.out: login.c
 
 
 customer.out: customer.c
-	gcc customer.c -o customer.out
+	gcc customer.c -o customer.out -I/opt/homebrew/Cellar/libsodium/1.0.20/include -L/opt/homebrew/Cellar/libsodium/1.0.20/lib -lsodium
