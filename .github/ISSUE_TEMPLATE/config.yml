@@ -1,0 +1,16 @@
+blank:    # Default template
+  - title: "Bug Report"
+    description: "Use this template for reporting bugs."
+    labels: ["bug"]
+
+bug_report:
+  - title: "Bug Report"
+    description: "Use this template to report bugs."
+
+feature_request:
+  - title: "Feature Request"
+    description: "Use this template to request new features."
+
+backlog_reminder:
+  - title: "Backlog Reminder"
+    description: "Use this template to set a reminder for the next step in your project."
