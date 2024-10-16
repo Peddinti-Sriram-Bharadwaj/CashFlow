@@ -9,6 +9,7 @@
 
 struct EmployeeLogin {
     char username[20];
+    char loggedin[2];
     char hashed_password[crypto_pwhash_STRBYTES]; // Store the hashed password
 };
 
@@ -35,14 +36,15 @@ int main() {
     fgets(password, sizeof(password), stdin);
     remove_newline(password);
 
-    struct EmployeeLogin e1;
-    strcpy(e1.username, username);
+    struct EmployeeLogin e;
+    strcpy(e.username, username);
 
     // Hash the password
-    if (crypto_pwhash_str(e1.hashed_password, password, strlen(password), crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
+    if (crypto_pwhash_str(e.hashed_password, password, strlen(password), crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
         printf("Error hashing the password\n");
         return 1;
     }
+    strncpy(e.loggedin, "n", sizeof(e.loggedin) - 1);
 
     char EmployeeLoginsPath[256];
     snprintf(EmployeeLoginsPath, sizeof(EmployeeLoginsPath), "%s%s", basePath, "/employee/employeelogins.txt");
@@ -53,7 +55,7 @@ int main() {
         return 1;
     }
 
-    write(fd, &e1, sizeof(e1));
+    write(fd, &e, sizeof(e));
     close(fd);
 
     printf("Employee added successfully\n");

@@ -9,6 +9,7 @@
 
 struct ManagerLogin{
   char username[20];
+  char loggedin[2];
   char hashed_password[crypto_pwhash_STRBYTES]; // Store the hashed password
 };
 
@@ -37,14 +38,15 @@ int main(){
     remove_newline(password);
 
     // Hash the password
-    struct ManagerLogin e1;
-    if (crypto_pwhash_str(e1.hashed_password, password, strlen(password), crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
+    struct ManagerLogin e;
+    if (crypto_pwhash_str(e.hashed_password, password, strlen(password), crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
         printf("Password hashing failed\n");
         return 1;
     }
 
     // Store the username and hashed password
-    strncpy(e1.username, username, sizeof(e1.username) - 1); // Ensure null-termination
+    strncpy(e.username, username, sizeof(e.username) - 1); // Ensure null-termination
+    strncpy(e.loggedin, "n", sizeof(e.loggedin));
 
     // Write to the manager login file
     char ManagerLoginsPath[256];
@@ -56,7 +58,7 @@ int main(){
     }
 
     // Write the struct with username and hashed password to the file
-    write(fd, &e1, sizeof(e1));
+    write(fd, &e, sizeof(e));
     close(fd);
 
     printf("Manager account created successfully\n");

@@ -9,6 +9,7 @@
 
 struct AdminLogin {
     char username[20];
+    char loggedin[2];
     char hashed_password[crypto_pwhash_STRBYTES]; // Store the hashed password
 };
 
@@ -57,6 +58,12 @@ int main() {
         return 0;
     }
 
+    if(strcmp(a.loggedin, "y")== 0){
+        printf("User already logged in one session");
+        close(fd);
+        return 0;
+    }
+
     printf("Enter the password\n");
     fgets(password, sizeof(password), stdin);
     remove_newline(password);
@@ -66,6 +73,22 @@ int main() {
         printf("Invalid password\n");
     } else {
         printf("Login successful\n");
+        close(fd);
+        a.loggedin[0] = 'y';
+        a.loggedin[1] = '\0';
+
+        int fd2 = open(AdminLoginsPath, O_RDWR);
+        if(fd2<0){
+            perror("Failed to open logins file for writing");
+            return 1;
+        }
+        lseek(fd2, -sizeof(a), SEEK_CUR);
+        
+        if(write(fd2, &a, sizeof(a)) != sizeof(a)){
+            perror("Failed to write updated long status");
+            close(fd2);
+            return 1;
+        }
         execvp(AdminActionsPath, NULL);
     }
 

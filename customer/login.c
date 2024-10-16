@@ -9,6 +9,7 @@
 
 struct CustomerLogin {
     char username[20];
+    char loggedin[2];
     char hashed_password[crypto_pwhash_STRBYTES]; // Store the hashed password
 };
 
@@ -48,10 +49,19 @@ int main() {
         }
         found = 1;
         break;
+        
     }
 
     if (!found) {
         printf("User doesn't exist\n");
+        close(fd);
+        return 0;
+    }
+
+    printf("%s\n", e.loggedin);
+
+    if(strcmp(e.loggedin, "y")== 0){
+        printf("User already logged in one session");
         close(fd);
         return 0;
     }
@@ -65,9 +75,26 @@ int main() {
         printf("Invalid password\n");
     } else {
         printf("Login successful\n");
+        close(fd);
+        e.loggedin[0] = 'y';
+        e.loggedin[1] = '\0';
+
+        int fd2 = open(CustomerLoginsPath, O_RDWR);
+        if(fd2<0){
+            perror("Failed to open logins file for writing");
+            return 1;
+        }
+        lseek(fd2, -sizeof(e), SEEK_CUR);
+        
+        if(write(fd2, &e, sizeof(e)) != sizeof(e)){
+            perror("Failed to write updated long status");
+            close(fd2);
+            return 1;
+        }
+        close(fd2);
         execvp(CustomerActionsPath, NULL);
+        perror("execvp failed");
     }
 
-    close(fd);
     return 0;
 }

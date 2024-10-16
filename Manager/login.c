@@ -9,6 +9,7 @@
 
 struct AdminLogin {
     char username[20];
+    char loggedin[2];
     char hashed_password[crypto_pwhash_STRBYTES]; // Store the hashed password
 };
 
@@ -43,9 +44,7 @@ int main() {
     fgets(username, sizeof(username), stdin);
     remove_newline(username);
     
-    printf("Enter password\n");
-    fgets(password, sizeof(password), stdin);
-    remove_newline(password);
+    
 
     // Open the file containing the manager logins
     fd = open(ManagerLoginsPath, O_RDONLY);
@@ -68,11 +67,37 @@ int main() {
         return 0;
     }
 
+    if(strcmp(a.loggedin, "y") == 0){
+        printf("User already logged in another session");
+        close(fd);
+        return 0;
+    }
+
+    printf("Enter password\n");
+    fgets(password, sizeof(password), stdin);
+    remove_newline(password);
+
     // Verify the entered password against the stored hash
     if (crypto_pwhash_str_verify(a.hashed_password, password, strlen(password)) != 0) {
         printf("Invalid password\n");
     } else {
         printf("Login successful\n");
+        close(fd);
+        a.loggedin[0] = 'y';
+        a.loggedin[1] = '\0';
+
+        int fd2 = open(ManagerLoginsPath, O_RDWR);
+        if(fd2<0){
+            perror("Failed to open logins file for writing");
+            return 1;
+        }
+        lseek(fd2, -sizeof(a), SEEK_CUR);
+        
+        if(write(fd2, &a, sizeof(a)) != sizeof(a)){
+            perror("Failed to write updated long status");
+            close(fd2);
+            return 1;
+        }
         execvp(ManagerActionsPath, NULL);
     }
 

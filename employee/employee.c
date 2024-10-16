@@ -29,6 +29,7 @@ int main(){
   switch(option){
     case 1:
       printf("Add new customer\n");
+
       break;
     case 2:
       printf("Modify customer details\n");

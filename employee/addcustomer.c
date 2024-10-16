@@ -9,6 +9,7 @@
 
 struct CustomerLogin {
     char username[20];
+    char loggedin[2];
     char hashed_password[crypto_pwhash_STRBYTES]; // Store the hashed password
 };
 
@@ -51,6 +52,7 @@ int main() {
 
     // Store the username and hashed password in the file
     strncpy(e.username, username, sizeof(e.username) - 1); // Ensure null-termination
+    strncpy(e.loggedin, "n", sizeof(e.loggedin) - 1);
     write(fd, &e, sizeof(e));
 
     printf("Account created successfully\n");

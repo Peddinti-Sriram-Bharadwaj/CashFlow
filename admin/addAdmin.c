@@ -9,6 +9,7 @@
 
 struct AdminLogin{
   char username[20];
+  char loggedin[2];
   char hashed_password[crypto_pwhash_STRBYTES]; // Store the hashed password
 };
 
@@ -37,14 +38,15 @@ int main(){
     remove_newline(password);
 
     // Hash the password
-    struct AdminLogin a1;
-    if (crypto_pwhash_str(a1.hashed_password, password, strlen(password), crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
+    struct AdminLogin a;
+    if (crypto_pwhash_str(a.hashed_password, password, strlen(password), crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
         printf("Password hashing failed\n");
         return 1;
     }
 
     // Store the username and hashed password in the struct
-    strncpy(a1.username, username, sizeof(a1.username) - 1); // Ensure null-termination
+    strncpy(a.username, username, sizeof(a.username) - 1); // Ensure null-termination
+    strncpy(a.loggedin, "n", sizeof(a.loggedin)-1);
 
     // Write to the admin login file
     char AdminLoginsPath[256];
@@ -57,7 +59,7 @@ int main(){
     }
 
     // Write the struct with username and hashed password to the file
-    write(fd, &a1, sizeof(a1));
+    write(fd, &a, sizeof(a));
     close(fd);
 
     printf("Admin account created successfully\n");

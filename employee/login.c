@@ -9,6 +9,7 @@
 
 struct EmployeeLogin {
     char username[20];
+    char loggedin[2];
     char hashed_password[crypto_pwhash_STRBYTES]; // Store the hashed password
 };
 
@@ -55,6 +56,11 @@ int main() {
         close(fd);
         return 0;
     }
+    if(strcmp(e.loggedin, "y") == 0){
+        printf("User already logged in another session");
+        close(fd);
+        return 0;
+    }
 
     printf("Enter your password\n");
     fgets(password, sizeof(password), stdin);
@@ -65,6 +71,22 @@ int main() {
         printf("Invalid password\n");
     } else {
         printf("Login successful\n");
+        close(fd);
+        e.loggedin[0] = 'y';
+        e.loggedin[1] = '\0';
+
+        int fd2 = open(EmployeeLoginsPath, O_RDWR);
+        if(fd2<0){
+            perror("Failed to open logins file for writing");
+            return 1;
+        }
+        lseek(fd2, -sizeof(e), SEEK_CUR);
+        
+        if(write(fd2, &e, sizeof(e)) != sizeof(e)){
+            perror("Failed to write updated long status");
+            close(fd2);
+            return 1;
+        }
         // use exec calls to execute employee.c file
         execvp(EmployeeActionsPath, NULL);
 
