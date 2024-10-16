@@ -1,0 +1,30 @@
+name: Feature Suggestion
+description: Suggest a new feature or improvement.
+title: "[Feature]: "
+labels: ["enhancement"]
+assignees: ""
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Help us improve by suggesting new features.**
+
+  - type: input
+    id: feature_summary
+    attributes:
+      label: "Feature Summary"
+      description: "A short summary of the feature."
+
+  - type: textarea
+    id: feature_description
+    attributes:
+      label: "Description"
+      description: "Describe the feature in detail."
+      placeholder: "Explain the motivation, use case, or why this would be beneficial."
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: "Additional Context"
+      description: "Add any other context or screenshots related to the feature request."
