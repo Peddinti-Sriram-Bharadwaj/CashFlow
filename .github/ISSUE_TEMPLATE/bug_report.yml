@@ -1,49 +1,88 @@
 name: Bug Report
-description: File a bug report to help us improve.
-title: "[Bug]: "
-labels: ["bug"]
+
+description: |
+  **Contact us for help!**  
+  If you encounter any issues, please use this template to report bugs. The more detail you provide, the faster we can address the issue.
+
+labels:
+  - bug
+
 assignees: []
 
 body:
   - type: markdown
     attributes:
       value: |
-        **Please describe the bug with as much detail as possible.**
+        **Please describe the bug in detail**  
+        This will help us identify and fix the problem quickly.
+        - What did you expect to happen?
+        - What actually happened?
+        - When did you first notice this issue?
 
   - type: input
     id: environment
     attributes:
       label: "Environment"
-      description: "Provide details about the operating system, browser, or software version."
+      description: |
+        Please provide details of your environment (OS, browser, version, etc.)
+        Example: Windows 10, Chrome 91, Node.js 16
 
   - type: textarea
-    id: description
+    id: bug_description
     attributes:
-      label: "Describe the bug"
-      description: "A clear and concise description of what the bug is."
-      placeholder: "What happened? What did you expect to happen?"
+      label: "Bug Description"
+      description: |
+        Please provide a detailed description of the bug.
+        What were you trying to do? What steps did you follow?
+        Be as descriptive as possible, including any error messages.
+      placeholder: |
+        Describe the bug that occurred.
+        Example: "Clicking the submit button on the form causes the app to crash."
 
   - type: textarea
-    id: steps
+    id: steps_to_reproduce
     attributes:
       label: "Steps to Reproduce"
-      description: "Please list the steps to reproduce the issue."
-      placeholder: "1. Go to '...'\n2. Click on '...'\n3. Scroll down to '...'\n4. See error"
+      description: |
+        Please list the steps to reproduce the issue.
+        - Example: "1. Open the app."
+        - Example: "2. Click on 'Submit'."
+      placeholder: |
+        1. Step 1: ...
+        2. Step 2: ...
 
-  - type: input
+  - type: textarea
     id: expected_behavior
     attributes:
       label: "Expected Behavior"
-      description: "Describe what you expected to happen."
+      description: |
+        What did you expect to happen instead of the bug occurring?
+      placeholder: |
+        Example: "I expected the form to submit without any errors."
 
   - type: input
-    id: actual_behavior
+    id: screenshot_url
     attributes:
-      label: "Actual Behavior"
-      description: "Describe what actually happened."
+      label: "Screenshots or GIFs (optional)"
+      description: |
+        If applicable, please provide a link to any screenshots or GIFs that demonstrate the bug.  
+        You can upload your images to an image hosting service (like [Imgur](https://imgur.com/)) and share the link.
+      placeholder: |
+        Example: "https://imgur.com/abc123"
 
   - type: input
-    id: logs
+    id: error_log
     attributes:
-      label: "Logs or screenshots"
-      description: "If applicable, add logs or screenshots here."
+      label: "Error Log (if available)"
+      description: |
+        If you encountered an error message or a log file, please paste it here.
+        Example: "Uncaught TypeError: Cannot read property 'x' of undefined"
+
+  - type: input
+    id: version
+    attributes:
+      label: "Version"
+      description: |
+        Please include the version of the app or tool where you encountered the issue.
+      placeholder: |
+        Example: "v1.0.0"
