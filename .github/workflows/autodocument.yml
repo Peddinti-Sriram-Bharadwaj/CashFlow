@@ -1,0 +1,35 @@
+name: Generate Doxygen Documentation
+
+# Trigger the workflow on push, pull request, and manual trigger
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  doxygen:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the code
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Step 2: Install Doxygen
+      - name: Install Doxygen
+        run: sudo apt-get update && sudo apt-get install -y doxygen
+
+      # Step 3: Run Doxygen to generate documentation
+      - name: Run Doxygen to generate documentation
+        run: doxygen Doxyfile
+
+      # Step 4: Upload documentation as an artifact
+      - name: Upload documentation as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: doxygen-docs
+          path: docs/html/
