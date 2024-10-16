@@ -8,12 +8,19 @@
 
 
 
-int main(){
+int main(int argc, char *argv[]) {
+    char* username = argv[0];
+
     char ExitPath[256];
     snprintf(ExitPath, sizeof(ExitPath), "%s%s", basePath, "/welcome.out");
 
+    char LogOutPath[256];
+    snprintf(LogOutPath, sizeof(LogOutPath), "%s%s", basePath, "/customer/logout.out");
+    printf("t\n");
+
 
     printf("welcome to Cashflow dear user\n");
+    printf("Hello %s\n", username);
     printf("please select one of the below options to proceed further\n");
     printf("View account balance -1\n");
     printf("Deposit money -2\n");
@@ -56,6 +63,9 @@ int main(){
             break;
         case 9:
             printf("Logout\n");
+            char *args[] = {username, NULL};
+            execvp(LogOutPath,args );
+
             break;
         case 10:
             printf("Exit\n");

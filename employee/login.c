@@ -88,7 +88,8 @@ int main() {
             return 1;
         }
         // use exec calls to execute employee.c file
-        execvp(EmployeeActionsPath, NULL);
+        char *args[] = {username,NULL};
+        execvp(EmployeeActionsPath, args);
 
     }
 

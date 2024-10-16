@@ -92,7 +92,8 @@ int main() {
             return 1;
         }
         close(fd2);
-        execvp(CustomerActionsPath, NULL);
+        char* args[] = {e.username, NULL};
+        execvp(CustomerActionsPath, args);
         perror("execvp failed");
     }
 

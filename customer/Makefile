@@ -1,4 +1,4 @@
-all: signup.out loginpage.out login.out customer.out
+all: signup.out loginpage.out login.out customer.out logout.out
 
 signup.out: signup.c
 	gcc signup.c -o signup.out
@@ -12,3 +12,6 @@ login.out: login.c
 
 customer.out: customer.c
 	gcc customer.c -o customer.out -I/opt/homebrew/Cellar/libsodium/1.0.20/include -L/opt/homebrew/Cellar/libsodium/1.0.20/lib -lsodium
+
+logout.out: logout.c
+	gcc logout.c -o logout.out -I/opt/homebrew/Cellar/libsodium/1.0.20/include -L/opt/homebrew/Cellar/libsodium/1.0.20/lib -lsodium

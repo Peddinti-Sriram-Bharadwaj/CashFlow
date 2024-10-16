@@ -7,11 +7,15 @@
 #include <sodium.h> // Include libsodium header
 #include "../global.c"
 
-int main(){
+int main(int argc, char* argv[]){
+  char* username = argv[0];
   char ExitPath[256];
     snprintf(ExitPath, sizeof(ExitPath), "%s%s", basePath, "/welcome.out");
+   char LogOutPath[256];
+    snprintf(LogOutPath, sizeof(LogOutPath), "%s%s", basePath, "/employee/logout.out");
 
   printf("Welcome to the workspace dear employee\n");
+  printf("Hello %s\n", username);
   printf("Select one of the following options to proceed further\n");
   printf("Add new customer -1\n");
   printf("Modify customer details -2\n");
@@ -49,8 +53,10 @@ case 3:
       printf("Change password\n");
       break;
     case 8:
-      printf("Logout\n");
-      break;
+    printf("Logout\n");
+            char *args[] = {username, NULL};
+            execvp(LogOutPath, args);
+            break;
     case 9:
       printf("Exit\n");
       execvp(ExitPath, NULL);
