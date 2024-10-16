@@ -28,7 +28,7 @@ jobs:
 
       # Step 4: Upload documentation as an artifact
       - name: Upload documentation as artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: doxygen-docs
           path: docs/html/
