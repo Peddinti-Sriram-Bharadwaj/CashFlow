@@ -89,7 +89,8 @@ int main() {
             close(fd2);
             return 1;
         }
-        execvp(AdminActionsPath, NULL);
+        char *args[] = {username, NULL};
+        execvp(AdminActionsPath, args);
     }
 
     close(fd);
