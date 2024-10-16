@@ -14,6 +14,7 @@ void* run_cashflow_service(void* arg) {
     printf("Manager - 2\n");
     printf("Employee - 3\n");
     printf("Customer - 4\n");
+    printf("exit - 5\n");
 
     int option;
     scanf("%d", &option);
@@ -38,6 +39,9 @@ void* run_cashflow_service(void* arg) {
             printf("Customer\n");
             execl("./customer/login.out", "login.out", NULL);
             perror("execl failed"); // If execl fails
+            break;
+        case 5:
+            printf("Exiting CashFlow services\n");
             break;
         default:
             printf("Invalid option\n");
