@@ -7,7 +7,6 @@
 #include <sodium.h> // Include libsodium header
 #include "../global.c"
 
-
 struct EmployeeLogin {
     char username[20];
     char loggedin[2]; // Should hold 'y' or 'n' and null terminator
@@ -22,13 +21,20 @@ void remove_newline(char *str) {
 }
 
 int main(int argc, char* argv[]) {
-     char ExitPath[256];
+    if (argc < 2) {
+        printf("Usage: %s <username>\n", argv[0]);
+        return 1;
+    }
+
+    char ExitPath[256];
     snprintf(ExitPath, sizeof(ExitPath), "%s%s", basePath, "/welcome.out");
+
     // Initialize libsodium (if needed)
     if (sodium_init() < 0) {
         printf("libsodium initialization failed\n");
         return 1;
     }
+
     char* username = argv[0];
     printf("inside the logout\n");
 
@@ -78,7 +84,12 @@ int main(int argc, char* argv[]) {
     close(fd); // Close write descriptor
 
     printf("User logged out successfully.\n");
-    execvp(ExitPath, NULL);
 
-    return 0; // Exit successfully
+    // Prepare arguments for execvp
+    char *args[] = {ExitPath, NULL};
+    execvp(ExitPath, args);
+
+    // If execvp returns, it must have failed
+    perror("execvp failed");
+    return 1;
 }

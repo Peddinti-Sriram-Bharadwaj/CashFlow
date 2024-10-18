@@ -13,6 +13,8 @@ int main(int argc, char* argv[]){
     snprintf(ExitPath, sizeof(ExitPath), "%s%s", basePath, "/welcome.out");
    char LogOutPath[256];
     snprintf(LogOutPath, sizeof(LogOutPath), "%s%s", basePath, "/employee/logout.out");
+  char AddCustomerPath[256];
+    snprintf(AddCustomerPath, sizeof(AddCustomerPath), "%s%s", basePath, "/employee/addcustomer.out");
 
   printf("Welcome to the workspace dear employee\n");
   printf("Hello %s\n", username);
@@ -33,6 +35,7 @@ int main(int argc, char* argv[]){
   switch(option){
     case 1:
       printf("Add new customer\n");
+      execvp(AddCustomerPath, NULL);
 
       break;
     case 2:
