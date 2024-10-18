@@ -66,6 +66,20 @@ struct DepositApplication {
     int amount;            // Amount to be deposited
 };
 
+// Struct for transfer request
+struct TransferRequest {
+    char username[20];     // Username of the customer
+    int client_sockfd;     // Client socket file descriptor
+};
+
+// Struct for transfer application
+struct TransferApplication {
+    char from_username[20];  // Username of the sender
+    char to_username[20];    // Username of the recipient
+    int amount;              // Amount to be transferred
+};
+
+
 
 // Function to handle adding a customer
 void *addcustomer(void *arg) {
@@ -296,8 +310,108 @@ void *handle_deposit_application(void *arg) {
     pthread_exit(NULL);
 }
 
+void *handle_transfer_money(void *arg) {
+    struct TransferRequest *request = (struct TransferRequest *)arg;
+    int client_sockfd = request->client_sockfd;
+    char *username = request->username;
 
+    // Step 1: Send "amount" prompt to the client
+    char send_message[] = "amount";
+    ssize_t num_bytes_sent = send(client_sockfd, send_message, sizeof(send_message), 0);
+    if (num_bytes_sent == -1) {
+        perror("send");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
 
+    // Step 2: Receive the transfer amount from the client
+    int transfer_amount;
+    ssize_t num_bytes_received = recv(client_sockfd, &transfer_amount, sizeof(transfer_amount), 0);
+    if (num_bytes_received == -1) {
+        perror("recv");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    // Step 3: Send "to_recipient" prompt to the client
+    char recipient_message[] = "to_recipient";
+    num_bytes_sent = send(client_sockfd, recipient_message, sizeof(recipient_message), 0);
+    if (num_bytes_sent == -1) {
+        perror("send");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    // Step 4: Receive the recipient's username from the client
+    char to_username[20];
+    num_bytes_received = recv(client_sockfd, to_username, sizeof(to_username), 0);
+    if (num_bytes_received == -1) {
+        perror("recv");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    // Step 5: Read the customers file and check if the recipient exists
+    FILE *file = fopen("customers.txt", "r+b");
+    if (file == NULL) {
+        perror("fopen");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    struct Customer temp_customer;
+    int sender_found = 0, receiver_found = 0;
+
+    // Search for the recipient in the customers file first
+    while (fread(&temp_customer, sizeof(struct Customer), 1, file) == 1) {
+        if (strcmp(temp_customer.username, to_username) == 0) {
+            receiver_found = 1; // Recipient found
+            break; // No need to keep searching if we find the recipient
+        }
+    }
+
+    // If the recipient is found, search for the sender and process the transfer
+    if (receiver_found) {
+        // Go back to the beginning of the file to search for the sender
+        fseek(file, 0, SEEK_SET);
+
+        while (fread(&temp_customer, sizeof(struct Customer), 1, file) == 1) {
+            if (strcmp(temp_customer.username, username) == 0) {
+                sender_found = 1; // Sender found
+                if (temp_customer.balance >= transfer_amount) {
+                    temp_customer.balance -= transfer_amount; // Deduct transfer amount from sender
+                    // Seek back and update the sender record
+                    fseek(file, -sizeof(struct Customer), SEEK_CUR);
+                    fwrite(&temp_customer, sizeof(struct Customer), 1, file);
+
+                    // Now update the recipient's balance
+                    while (fread(&temp_customer, sizeof(struct Customer), 1, file) == 1) {
+                        if (strcmp(temp_customer.username, to_username) == 0) {
+                            temp_customer.balance += transfer_amount; // Add transfer amount to receiver
+                            // Seek back and update the receiver record
+                            fseek(file, -sizeof(struct Customer), SEEK_CUR);
+                            fwrite(&temp_customer, sizeof(struct Customer), 1, file);
+                            break;
+                        }
+                    }
+                } else {
+                    // Insufficient balance for sender
+                    break;
+                }
+            }
+        }
+    }
+
+    fclose(file);
+
+    // Step 6: Send success or failure message to the client
+    int response = (sender_found && receiver_found ) ? 1 : -1;
+    send(client_sockfd, &response, sizeof(response), 0);
+
+    // Step 7: Clean up and exit the thread
+    close(client_sockfd);
+    pthread_exit(NULL);
+}
 
 void *handle_client(void *arg) {
     int client_sockfd = *(int *)arg;
@@ -421,6 +535,30 @@ void *handle_client(void *arg) {
                 pthread_exit(NULL);
             }
             break;
+
+        // Add this case inside the handle_client() switch statement
+        case 't': // New case for transfer operation
+            if (strcmp(operation.operation, "transferMoney") == 0) {
+                struct TransferRequest *transfer_request = malloc(sizeof(struct TransferRequest));
+                if (transfer_request == NULL) {
+                    perror("malloc");
+                    close(client_sockfd);
+                    pthread_exit(NULL);
+                }
+
+                // Copy the username and socket descriptor to the transfer request structure
+                strncpy(transfer_request->username, operation.data.customer.username, sizeof(transfer_request->username) - 1);
+                transfer_request->username[sizeof(transfer_request->username) - 1] = '\0'; // Null-terminate
+                transfer_request->client_sockfd = client_sockfd;
+
+                // Create a new thread to handle the transfer
+                pthread_create(&thread_id, NULL, handle_transfer_money, transfer_request);
+            } else {
+                close(client_sockfd);
+                pthread_exit(NULL);
+            }
+            break;
+
 
 
         default:
