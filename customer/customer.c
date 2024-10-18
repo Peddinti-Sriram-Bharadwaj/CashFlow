@@ -23,6 +23,9 @@ int main(int argc, char *argv[]) {
 
     char loanApplicationPath[256];
     snprintf(loanApplicationPath, sizeof(loanApplicationPath), "%s%s", basePath, "/customer/loanApplication.out");
+    
+    char depositMoneyPath[256];
+    snprintf(depositMoneyPath, sizeof(depositMoneyPath), "%s%s", basePath, "/customer/depositMoney.out");
 
 
     printf("welcome to Cashflow dear user\n");
@@ -49,6 +52,7 @@ int main(int argc, char *argv[]) {
             break;
         case 2:
             printf("Deposit money\n");
+            execvp(depositMoneyPath, argv);
             break;
         case 3:
             printf("Withdraw money\n");

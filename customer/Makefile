@@ -1,4 +1,4 @@
-all: signup.out loginpage.out login.out customer.out logout.out getBalance.out loanApplication.out
+all: signup.out loginpage.out login.out customer.out logout.out getBalance.out loanApplication.out depositMoney.out
 
 signup.out: signup.c
 	gcc signup.c -o signup.out
@@ -21,3 +21,6 @@ getBalance.out: getBalance.c
 
 loanApplication.out: loanApplication.c
 	gcc loanApplication.c -o loanApplication.out 
+
+depositMoney.out: depositMoney.c
+	gcc depositMoney.c -o depositMoney.out

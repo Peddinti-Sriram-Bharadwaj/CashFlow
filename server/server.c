@@ -54,6 +54,19 @@ struct LoanApplication {
     char assigned_employee[20]; // Initially set to "None"
 };
 
+// Struct for deposit request
+struct DepositRequest {
+    char username[20];     // Username of the customer
+    int client_sockfd;     // Client socket file descriptor
+};
+
+// Struct for deposit application
+struct DepositApplication {
+    char username[20];     // Username of the customer
+    int amount;            // Amount to be deposited
+};
+
+
 // Function to handle adding a customer
 void *addcustomer(void *arg) {
     struct Customer *customer = (struct Customer *)arg;
@@ -225,6 +238,65 @@ void *handle_loan_application(void *arg) {
     pthread_exit(NULL);
 }
 
+// Function to handle deposit application
+void *handle_deposit_application(void *arg) {
+    struct DepositRequest *request = (struct DepositRequest *)arg;
+    int client_sockfd = request->client_sockfd;
+
+    // Step 1: Send "amount" prompt to the client
+    char send_message[] = "amount";
+    ssize_t num_bytes_sent = send(client_sockfd, send_message, sizeof(send_message), 0);
+    if (num_bytes_sent == -1) {
+        perror("send");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    // Step 2: Receive the deposit amount from the client
+    int deposit_amount;
+    ssize_t num_bytes_received = recv(client_sockfd, &deposit_amount, sizeof(deposit_amount), 0);
+    if (num_bytes_received == -1) {
+        perror("recv");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    // Step 3: Read the customers file and update the balance for the specified customer
+    FILE *file = fopen("customers.txt", "r+b");
+    if (file == NULL) {
+        perror("fopen");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    struct Customer temp_customer;
+    int found = 0;
+
+    // Search for the customer and update their balance
+    while (fread(&temp_customer, sizeof(struct Customer), 1, file) == 1) {
+        if (strcmp(temp_customer.username, request->username) == 0) {
+            found = 1;
+            temp_customer.balance += deposit_amount;
+
+            // Seek back and update the record
+            fseek(file, -sizeof(struct Customer), SEEK_CUR);
+            fwrite(&temp_customer, sizeof(struct Customer), 1, file);
+            break;
+        }
+    }
+
+    fclose(file);
+
+    // Step 4: Send success or failure message to the client
+    int response = found ? 1 : -1;
+    send(client_sockfd, &response, sizeof(response), 0);
+
+    // Step 5: Clean up and exit the thread
+    close(client_sockfd);
+    pthread_exit(NULL);
+}
+
+
 
 
 void *handle_client(void *arg) {
@@ -326,6 +398,30 @@ void *handle_client(void *arg) {
                 pthread_exit(NULL);
             }
             break;
+    
+    // Add this case inside the handle_client() switch statement
+        case 'd': // New case for deposit operation
+            if (strcmp(operation.operation, "depositMoney") == 0) {
+                struct DepositRequest *deposit_request = malloc(sizeof(struct DepositRequest));
+                if (deposit_request == NULL) {
+                    perror("malloc");
+                    close(client_sockfd);
+                    pthread_exit(NULL);
+                }
+
+                // Copy the username and socket descriptor to the deposit request structure
+                strncpy(deposit_request->username, operation.data.customer.username, sizeof(deposit_request->username) - 1);
+                deposit_request->username[sizeof(deposit_request->username) - 1] = '\0'; // Null-terminate
+                deposit_request->client_sockfd = client_sockfd;
+
+                // Create a new thread to handle the deposit
+                pthread_create(&thread_id, NULL, handle_deposit_application, deposit_request);
+            } else {
+                close(client_sockfd);
+                pthread_exit(NULL);
+            }
+            break;
+
 
         default:
             close(client_sockfd);
