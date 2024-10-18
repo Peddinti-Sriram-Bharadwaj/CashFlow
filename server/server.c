@@ -11,6 +11,14 @@
 #define SOCKET_PATH "/tmp/server"
 #define BUFFER_SIZE 256
 
+pthread_mutex_t customer_file_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t admin_file_mutex = PTHREAD_MUTEX_INITIALIZER;  // Mutex to synchronize file access for admins
+pthread_mutex_t employee_file_mutex = PTHREAD_MUTEX_INITIALIZER;  // Mutex to synchronize file access for employees
+pthread_mutex_t manager_file_mutex = PTHREAD_MUTEX_INITIALIZER;  // Mutex to synchronize file access for managers
+pthread_mutex_t loan_application_file_mutex = PTHREAD_MUTEX_INITIALIZER;  // Mutex to synchronize file access for loan applications
+
+
+
 struct Customer {
     char username[20];
     int balance;
@@ -85,43 +93,60 @@ struct WithdrawalRequest {
 };
 
 
-
-
 // Function to handle adding a customer
 void *addcustomer(void *arg) {
     struct Customer *customer = (struct Customer *)arg;
 
+    // Lock the mutex before accessing the file
+    pthread_mutex_lock(&customer_file_mutex);
+
     FILE *file = fopen("customers.txt", "ab");
     if (file == NULL) {
         perror("fopen");
+        pthread_mutex_unlock(&customer_file_mutex);  // Unlock before exiting
         pthread_exit(NULL);
     }
 
     if (fwrite(customer, sizeof(struct Customer), 1, file) != 1) {
         perror("fwrite");
         fclose(file);
+        pthread_mutex_unlock(&customer_file_mutex);  // Unlock before exiting
         pthread_exit(NULL);
     }
+
     fclose(file);
+
+    // Unlock the mutex after the file operation is complete
+    pthread_mutex_unlock(&customer_file_mutex);
+
     pthread_exit(NULL);
 }
 
-// Function to handle adding an admin
 void *addadmin(void *arg) {
     struct Admin *admin = (struct Admin *)arg;
+
+    // Lock the mutex before accessing the file
+    pthread_mutex_lock(&admin_file_mutex);
 
     FILE *file = fopen("admins.txt", "ab");
     if (file == NULL) {
         perror("fopen");
+        pthread_mutex_unlock(&admin_file_mutex);  // Unlock before exiting
         pthread_exit(NULL);
     }
 
     if (fwrite(admin, sizeof(struct Admin), 1, file) != 1) {
         perror("fwrite");
         fclose(file);
+        pthread_mutex_unlock(&admin_file_mutex);  // Unlock before exiting
         pthread_exit(NULL);
     }
+
     fclose(file);
+
+    // Unlock the mutex after the file operation is complete
+    pthread_mutex_unlock(&admin_file_mutex);
+
     pthread_exit(NULL);
 }
 
@@ -129,18 +154,28 @@ void *addadmin(void *arg) {
 void *addemployee(void *arg) {
     struct Employee *employee = (struct Employee *)arg;
 
+    // Lock the mutex before accessing the file
+    pthread_mutex_lock(&employee_file_mutex);
+
     FILE *file = fopen("employees.txt", "ab");
     if (file == NULL) {
         perror("fopen");
+        pthread_mutex_unlock(&employee_file_mutex);  // Unlock before exiting
         pthread_exit(NULL);
     }
 
     if (fwrite(employee, sizeof(struct Employee), 1, file) != 1) {
         perror("fwrite");
         fclose(file);
+        pthread_mutex_unlock(&employee_file_mutex);  // Unlock before exiting
         pthread_exit(NULL);
     }
+
     fclose(file);
+
+    // Unlock the mutex after the file operation is complete
+    pthread_mutex_unlock(&employee_file_mutex);
+
     pthread_exit(NULL);
 }
 
@@ -148,29 +183,44 @@ void *addemployee(void *arg) {
 void *addmanager(void *arg) {
     struct Manager *manager = (struct Manager *)arg;
 
+    // Lock the mutex before accessing the file
+    pthread_mutex_lock(&manager_file_mutex);
+
     FILE *file = fopen("managers.txt", "ab");
     if (file == NULL) {
         perror("fopen");
+        pthread_mutex_unlock(&manager_file_mutex);  // Unlock before exiting
         pthread_exit(NULL);
     }
 
     if (fwrite(manager, sizeof(struct Manager), 1, file) != 1) {
         perror("fwrite");
         fclose(file);
+        pthread_mutex_unlock(&manager_file_mutex);  // Unlock before exiting
         pthread_exit(NULL);
     }
+
     fclose(file);
+
+    // Unlock the mutex after the file operation is complete
+    pthread_mutex_unlock(&manager_file_mutex);
+
     pthread_exit(NULL);
 }
+
 
 void *getbalance(void *arg) {
     struct BalanceRequest *request = (struct BalanceRequest *)arg;
     struct Customer *customer = &request->customer;
     int client_sockfd = request->client_sockfd;
 
+    // Lock the mutex before accessing the file
+    pthread_mutex_lock(&customer_file_mutex);
+
     FILE *file = fopen("customers.txt", "rb");
     if (file == NULL) {
         perror("fopen");
+        pthread_mutex_unlock(&customer_file_mutex);  // Unlock before exiting
         pthread_exit(NULL);
     }
 
@@ -190,15 +240,18 @@ void *getbalance(void *arg) {
         }
     }
     fclose(file);
+
+    // Unlock the mutex after the file operation is complete
+    pthread_mutex_unlock(&customer_file_mutex);
+
     pthread_exit(NULL);
 }
 
-// Function to handle loan application
 void *handle_loan_application(void *arg) {
     struct LoanRequest *request = (struct LoanRequest *)arg;
     int client_sockfd = request->client_sockfd;
 
-    // Step 1: Send "send" to the client
+    // Step 1: Send "amount" to the client
     char send_message[] = "amount";
     ssize_t num_bytes_sent = send(client_sockfd, send_message, sizeof(send_message), 0);
     if (num_bytes_sent == -1) {
@@ -224,10 +277,14 @@ void *handle_loan_application(void *arg) {
     strncpy(loan_application.assigned_employee, "None", sizeof(loan_application.assigned_employee) - 1);
     loan_application.assigned_employee[sizeof(loan_application.assigned_employee) - 1] = '\0'; // Null-terminate
 
-    // Step 4: Write the structure to the loanApplications.txt file
+    // Step 4: Lock the mutex before accessing the loan applications file
+    pthread_mutex_lock(&loan_application_file_mutex);
+
+    // Write the structure to the loanApplications.txt file
     FILE *file = fopen("loanApplications.txt", "ab");
     if (file == NULL) {
         perror("fopen");
+        pthread_mutex_unlock(&loan_application_file_mutex);  // Unlock before exiting
         close(client_sockfd);
         pthread_exit(NULL);
     }
@@ -240,6 +297,7 @@ void *handle_loan_application(void *arg) {
         int failure_message = -1;
         send(client_sockfd, &failure_message, sizeof(failure_message), 0);
 
+        pthread_mutex_unlock(&loan_application_file_mutex);  // Unlock before exiting
         close(client_sockfd);
         pthread_exit(NULL);
     }
@@ -253,12 +311,14 @@ void *handle_loan_application(void *arg) {
         perror("send");
     }
 
-    // Step 6: Clean up and exit the thread
+    // Step 6: Unlock the mutex after the file operation is complete
+    pthread_mutex_unlock(&loan_application_file_mutex);
+
+    // Step 7: Clean up and exit the thread
     close(client_sockfd);
     pthread_exit(NULL);
 }
 
-// Function to handle deposit application
 void *handle_deposit_application(void *arg) {
     struct DepositRequest *request = (struct DepositRequest *)arg;
     int client_sockfd = request->client_sockfd;
@@ -292,6 +352,9 @@ void *handle_deposit_application(void *arg) {
     struct Customer temp_customer;
     int found = 0;
 
+    // Lock the mutex to ensure exclusive access to the customer file
+    pthread_mutex_lock(&customer_file_mutex);
+
     // Search for the customer and update their balance
     while (fread(&temp_customer, sizeof(struct Customer), 1, file) == 1) {
         if (strcmp(temp_customer.username, request->username) == 0) {
@@ -305,16 +368,25 @@ void *handle_deposit_application(void *arg) {
         }
     }
 
+    // Unlock the mutex after updating the customer file
+    pthread_mutex_unlock(&customer_file_mutex);
+
     fclose(file);
 
     // Step 4: Send success or failure message to the client
     int response = found ? 1 : -1;
-    send(client_sockfd, &response, sizeof(response), 0);
+    num_bytes_sent = send(client_sockfd, &response, sizeof(response), 0);
+    if (num_bytes_sent == -1) {
+        perror("send");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
 
     // Step 5: Clean up and exit the thread
     close(client_sockfd);
     pthread_exit(NULL);
 }
+
 
 void *handle_transfer_money(void *arg) {
     struct TransferRequest *request = (struct TransferRequest *)arg;
@@ -368,6 +440,9 @@ void *handle_transfer_money(void *arg) {
     struct Customer temp_customer;
     int sender_found = 0, receiver_found = 0;
 
+    // Lock the mutex to ensure exclusive access to the customer file
+    pthread_mutex_lock(&customer_file_mutex);
+
     // Search for the recipient in the customers file first
     while (fread(&temp_customer, sizeof(struct Customer), 1, file) == 1) {
         if (strcmp(temp_customer.username, to_username) == 0) {
@@ -408,16 +483,20 @@ void *handle_transfer_money(void *arg) {
         }
     }
 
+    // Unlock the mutex after updating the customer file
+    pthread_mutex_unlock(&customer_file_mutex);
+
     fclose(file);
 
     // Step 6: Send success or failure message to the client
-    int response = (sender_found && receiver_found ) ? 1 : -1;
+    int response = (sender_found && receiver_found) ? 1 : -1;
     send(client_sockfd, &response, sizeof(response), 0);
 
     // Step 7: Clean up and exit the thread
     close(client_sockfd);
     pthread_exit(NULL);
 }
+
 
 // Function to handle withdrawal application
 void *handle_withdrawal_application(void *arg) {
@@ -453,6 +532,9 @@ void *handle_withdrawal_application(void *arg) {
     struct Customer temp_customer;
     int found = 0;
 
+    // Lock the mutex to ensure exclusive access to the customer file
+    pthread_mutex_lock(&customer_file_mutex);
+
     // Search for the customer and check if withdrawal is possible
     while (fread(&temp_customer, sizeof(struct Customer), 1, file) == 1) {
         if (strcmp(temp_customer.username, request->username) == 0) {
@@ -464,7 +546,7 @@ void *handle_withdrawal_application(void *arg) {
                 // Seek back and update the record
                 fseek(file, -sizeof(struct Customer), SEEK_CUR);
                 fwrite(&temp_customer, sizeof(struct Customer), 1, file);
-                
+
                 // Send success response to the client
                 int response = 1; // Success
                 send(client_sockfd, &response, sizeof(response), 0);
@@ -476,6 +558,9 @@ void *handle_withdrawal_application(void *arg) {
             break;
         }
     }
+
+    // Unlock the mutex after updating the customer file
+    pthread_mutex_unlock(&customer_file_mutex);
 
     fclose(file);
 
@@ -489,6 +574,7 @@ void *handle_withdrawal_application(void *arg) {
     close(client_sockfd);
     pthread_exit(NULL);
 }
+
 
 
 void *handle_client(void *arg) {
