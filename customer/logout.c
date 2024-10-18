@@ -11,7 +11,7 @@
 struct CustomerLogin {
     char username[20];
     char loggedin[2]; // Should hold 'y' or 'n' and null terminator
-    char hashed_password[crypto_pwhash_STRBYTES]; // Store the hashed password
+    char hashed_passsword[crypto_pwhash_STRBYTES]; // Store the hashed password
 };
 
 void remove_newline(char *str) {
