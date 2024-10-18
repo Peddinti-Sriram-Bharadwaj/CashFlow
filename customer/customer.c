@@ -18,6 +18,9 @@ int main(int argc, char *argv[]) {
     snprintf(LogOutPath, sizeof(LogOutPath), "%s%s", basePath, "/customer/logout.out");
     printf("t\n");
 
+    char getBalancePath[256];
+    snprintf(getBalancePath, sizeof(getBalancePath), "%s%s", basePath, "/customer/getBalance.out");
+
 
     printf("welcome to Cashflow dear user\n");
     printf("Hello %s\n", username);
@@ -39,6 +42,7 @@ int main(int argc, char *argv[]) {
     switch(option){
         case 1:
             printf("View account balance\n");
+            execvp(getBalancePath, argv);
             break;
         case 2:
             printf("Deposit money\n");

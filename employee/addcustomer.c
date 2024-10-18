@@ -20,12 +20,12 @@ struct CustomerLogin {
     char hashed_password[crypto_pwhash_STRBYTES]; // Store the hashed password
 };
 
-struct Customer{
+struct Customer {
     char username[20];
     int balance;
 };
 
-struct Operation{
+struct Operation {
     char operation[20];
     struct Customer customer;
 };
@@ -46,11 +46,16 @@ int main(int argc, char *argv[]) {
     char EmployeeActionsPath[256];
     snprintf(EmployeeActionsPath, sizeof(EmployeeActionsPath), "%s%s", basePath, "/employee/employee.out");
 
-
     char CustomerLoginsPath[256];
     snprintf(CustomerLoginsPath, sizeof(CustomerLoginsPath), "%s%s", basePath, "/customer/customerlogins.txt");
 
+    // Open the file to write customer login data
     int fd = open(CustomerLoginsPath, O_WRONLY | O_CREAT | O_APPEND, 0644);
+    if (fd == -1) {
+        printf("Failed to open customer login file\n");
+        return 1;
+    }
+
     struct CustomerLogin e;
     char username[20], password[20];
 
@@ -86,10 +91,11 @@ int main(int argc, char *argv[]) {
     o.customer = c;
     c.balance = 0;
 
+    // Socket programming to send customer data to server
     int sockfd;
     struct sockaddr_un server_addr;
 
-    if ((sockfd = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1) {
+    if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
         perror("socket");
         exit(1);
     }
@@ -98,15 +104,26 @@ int main(int argc, char *argv[]) {
     server_addr.sun_family = AF_UNIX;
     strncpy(server_addr.sun_path, SOCKET_PATH, sizeof(server_addr.sun_path) - 1);
 
-    //datagram client
-    if (sendto(sockfd, &o, sizeof(o), 0, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
-        perror("sendto");
+    // Connect to the server
+    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
+        perror("connect");
         close(sockfd);
         exit(1);
     }
 
+    // Send the operation to the server
+    if (send(sockfd, &o, sizeof(o), 0) == -1) {
+        perror("send");
+        close(sockfd);
+        exit(1);
+    }
+
+    printf("Customer data sent to server\n");
+
+    // Close the socket
     close(sockfd);
 
+    // Execute the employee actions program
     execvp(EmployeeActionsPath, argv);
 
     return 0;

@@ -38,6 +38,7 @@ int main(int argc, char *argv[]) {
 
     char AdminActionsPath[256];
     snprintf(AdminActionsPath, sizeof(AdminActionsPath), "%s%s", basePath, "/admin/admin.out");
+
     // Initialize libsodium
     if (sodium_init() < 0) {
         printf("libsodium initialization failed\n");
@@ -73,8 +74,6 @@ int main(int argc, char *argv[]) {
     op.manager = e;
 
     // Write to the manager login file (optional)
-    
-    
     int fd = open(ManagerLoginsPath, O_RDWR | O_APPEND | O_CREAT, 0644);
     if (fd == -1) {
         printf("Failed to open the file\n");
@@ -87,11 +86,11 @@ int main(int argc, char *argv[]) {
 
     printf("Manager account created successfully\n");
 
-    // Socket programming to send manager data to server
+    // Socket programming to send manager data to server using stream sockets
     int sockfd;
     struct sockaddr_un server_addr;
 
-    if ((sockfd = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1) {
+    if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
         perror("socket");
         exit(1);
     }
@@ -99,18 +98,25 @@ int main(int argc, char *argv[]) {
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sun_family = AF_UNIX;
 
-   // Set up socket path
-   strncpy(server_addr.sun_path, SOCKET_PATH, sizeof(server_addr.sun_path) - 1);
+    // Set up socket path
+    strncpy(server_addr.sun_path, SOCKET_PATH, sizeof(server_addr.sun_path) - 1);
 
-   // Send the operation to the server
-   if (sendto(sockfd, &op, sizeof(op), 0, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
-       perror("sendto");
-       close(sockfd);
-       exit(1);
-   }
+    // Connect to the server
+    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
+        perror("connect");
+        close(sockfd);
+        exit(1);
+    }
 
-   close(sockfd);
-   execvp(AdminActionsPath, argv);
+    // Send the operation to the server
+    if (send(sockfd, &op, sizeof(op), 0) == -1) {
+        perror("send");
+        close(sockfd);
+        exit(1);
+    }
 
-   return 0;
+    close(sockfd);
+    execvp(AdminActionsPath, argv);
+
+    return 0;
 }
