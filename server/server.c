@@ -43,6 +43,17 @@ struct BalanceRequest {
     int client_sockfd; // Client socket file descriptor
 };
 
+struct LoanRequest {
+    char username[20];
+    int client_sockfd; // Client socket file descriptor
+};
+
+struct LoanApplication {
+    char username[20];
+    int amount;
+    char assigned_employee[20]; // Initially set to "None"
+};
+
 // Function to handle adding a customer
 void *addcustomer(void *arg) {
     struct Customer *customer = (struct Customer *)arg;
@@ -149,6 +160,72 @@ void *getbalance(void *arg) {
     pthread_exit(NULL);
 }
 
+// Function to handle loan application
+void *handle_loan_application(void *arg) {
+    struct LoanRequest *request = (struct LoanRequest *)arg;
+    int client_sockfd = request->client_sockfd;
+
+    // Step 1: Send "send" to the client
+    char send_message[] = "amount";
+    ssize_t num_bytes_sent = send(client_sockfd, send_message, sizeof(send_message), 0);
+    if (num_bytes_sent == -1) {
+        perror("send");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    // Step 2: Receive the loan amount from the client
+    int loan_amount;
+    ssize_t num_bytes_received = recv(client_sockfd, &loan_amount, sizeof(loan_amount), 0);
+    if (num_bytes_received == -1) {
+        perror("recv");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    // Step 3: Create the LoanApplication structure and assign values
+    struct LoanApplication loan_application;
+    strncpy(loan_application.username, request->username, sizeof(loan_application.username) - 1);
+    loan_application.username[sizeof(loan_application.username) - 1] = '\0'; // Null-terminate
+    loan_application.amount = loan_amount;
+    strncpy(loan_application.assigned_employee, "None", sizeof(loan_application.assigned_employee) - 1);
+    loan_application.assigned_employee[sizeof(loan_application.assigned_employee) - 1] = '\0'; // Null-terminate
+
+    // Step 4: Write the structure to the loanApplications.txt file
+    FILE *file = fopen("loanApplications.txt", "ab");
+    if (file == NULL) {
+        perror("fopen");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    if (fwrite(&loan_application, sizeof(struct LoanApplication), 1, file) != 1) {
+        perror("fwrite");
+        fclose(file);
+
+        // Send failure response to the client
+        int failure_message = -1;
+        send(client_sockfd, &failure_message, sizeof(failure_message), 0);
+
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    fclose(file);
+
+    // Step 5: Send success message to the client
+    int success_message = 1;
+    ssize_t success_bytes_sent = send(client_sockfd, &success_message, sizeof(success_message), 0);
+    if (success_bytes_sent == -1) {
+        perror("send");
+    }
+
+    // Step 6: Clean up and exit the thread
+    close(client_sockfd);
+    pthread_exit(NULL);
+}
+
+
 
 void *handle_client(void *arg) {
     int client_sockfd = *(int *)arg;
@@ -231,6 +308,25 @@ void *handle_client(void *arg) {
             }
             break;
 
+        case 'l': // New case for loan application
+            if (strcmp(operation.operation, "loanApplication") == 0) {
+                struct LoanRequest *loan_request = malloc(sizeof(struct LoanRequest));
+                if (loan_request == NULL) {
+                    perror("malloc");
+                    close(client_sockfd);
+                    pthread_exit(NULL);
+                }
+
+                memcpy(&loan_request->username, &operation.data.customer.username, sizeof(struct Customer));
+                loan_request->client_sockfd = client_sockfd;
+
+                pthread_create(&thread_id, NULL, handle_loan_application, loan_request);
+            } else {
+                close(client_sockfd);
+                pthread_exit(NULL);
+            }
+            break;
+
         default:
             close(client_sockfd);
             pthread_exit(NULL);
@@ -239,6 +335,7 @@ void *handle_client(void *arg) {
     pthread_detach(thread_id);
     pthread_exit(NULL);
 }
+
 
 int main() {
     int sockfd;

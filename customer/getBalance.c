@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include "../global.c"
 
 #define SOCKET_PATH "/tmp/server"
 #define BUFFER_SIZE 256
@@ -17,6 +18,9 @@ struct Operation {
 };
 
 int main(int argc, char *argv[]) {
+    char CustomerActionsPath[256];
+    snprintf(CustomerActionsPath, sizeof(CustomerActionsPath), "%s%s", basePath, "/customer/customer.out");
+
 
     char *username = argv[0]; // Use the second argument as the username
     printf("This is the username: %s\n", username);
@@ -81,6 +85,8 @@ int main(int argc, char *argv[]) {
 
     // Close the socket
     close(sockfd);
+        execvp(CustomerActionsPath, argv);
+        perror("execvp failed");
 
     return 0; // Exit successfully
 }
