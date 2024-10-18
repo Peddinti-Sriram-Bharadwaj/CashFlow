@@ -1,4 +1,4 @@
-all: signup.out loginpage.out login.out customer.out logout.out getBalance.out loanApplication.out depositMoney.out transferMoney.out
+all: signup.out loginpage.out login.out customer.out logout.out getBalance.out loanApplication.out depositMoney.out transferMoney.out withdrawMoney.out
 
 signup.out: signup.c
 	gcc signup.c -o signup.out
@@ -27,6 +27,9 @@ depositMoney.out: depositMoney.c
 
 transferMoney.out: transferMoney.c
 	gcc transferMoney.c -o transferMoney.out
+
+withdrawMoney.out: withdrawMoney.c
+	gcc withdrawMoney.c -o withdrawMoney.out
 
 clean:
 	rm -f *.out

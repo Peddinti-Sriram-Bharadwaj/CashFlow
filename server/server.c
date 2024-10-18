@@ -79,6 +79,12 @@ struct TransferApplication {
     int amount;              // Amount to be transferred
 };
 
+struct WithdrawalRequest {
+    char username[20];  // To store the customer's username
+    int client_sockfd;  // To store the client socket file descriptor
+};
+
+
 
 
 // Function to handle adding a customer
@@ -413,6 +419,78 @@ void *handle_transfer_money(void *arg) {
     pthread_exit(NULL);
 }
 
+// Function to handle withdrawal application
+void *handle_withdrawal_application(void *arg) {
+    struct WithdrawalRequest *request = (struct WithdrawalRequest *)arg;
+    int client_sockfd = request->client_sockfd;
+
+    // Step 1: Send "amount" prompt to the client
+    char send_message[] = "amount";
+    ssize_t num_bytes_sent = send(client_sockfd, send_message, sizeof(send_message), 0);
+    if (num_bytes_sent == -1) {
+        perror("send");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    // Step 2: Receive the withdrawal amount from the client
+    int withdrawal_amount;
+    ssize_t num_bytes_received = recv(client_sockfd, &withdrawal_amount, sizeof(withdrawal_amount), 0);
+    if (num_bytes_received == -1) {
+        perror("recv");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    // Step 3: Read the customers file and update the balance for the specified customer
+    FILE *file = fopen("customers.txt", "r+b");
+    if (file == NULL) {
+        perror("fopen");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    struct Customer temp_customer;
+    int found = 0;
+
+    // Search for the customer and check if withdrawal is possible
+    while (fread(&temp_customer, sizeof(struct Customer), 1, file) == 1) {
+        if (strcmp(temp_customer.username, request->username) == 0) {
+            found = 1;
+            // Check if sufficient balance is available
+            if (temp_customer.balance >= withdrawal_amount) {
+                temp_customer.balance -= withdrawal_amount; // Deduct the withdrawal amount
+
+                // Seek back and update the record
+                fseek(file, -sizeof(struct Customer), SEEK_CUR);
+                fwrite(&temp_customer, sizeof(struct Customer), 1, file);
+                
+                // Send success response to the client
+                int response = 1; // Success
+                send(client_sockfd, &response, sizeof(response), 0);
+            } else {
+                // Not enough funds
+                int response = -1; // Failure
+                send(client_sockfd, &response, sizeof(response), 0);
+            }
+            break;
+        }
+    }
+
+    fclose(file);
+
+    // If customer not found, send failure response
+    if (!found) {
+        int response = -1; // Failure
+        send(client_sockfd, &response, sizeof(response), 0);
+    }
+
+    // Step 4: Clean up and exit the thread
+    close(client_sockfd);
+    pthread_exit(NULL);
+}
+
+
 void *handle_client(void *arg) {
     int client_sockfd = *(int *)arg;
     free(arg);
@@ -558,6 +636,29 @@ void *handle_client(void *arg) {
                 pthread_exit(NULL);
             }
             break;
+        
+        case 'w': // New case for withdrawal operation
+    if (strcmp(operation.operation, "withdrawMoney") == 0) {
+        struct WithdrawalRequest *withdrawal_request = malloc(sizeof(struct WithdrawalRequest));
+        if (withdrawal_request == NULL) {
+            perror("malloc");
+            close(client_sockfd);
+            pthread_exit(NULL);
+        }
+
+        // Copy the username and socket descriptor to the withdrawal request structure
+        strncpy(withdrawal_request->username, operation.data.customer.username, sizeof(withdrawal_request->username) - 1);
+        withdrawal_request->username[sizeof(withdrawal_request->username) - 1] = '\0'; // Null-terminate
+        withdrawal_request->client_sockfd = client_sockfd;
+
+        // Create a new thread to handle the withdrawal
+        pthread_create(&thread_id, NULL, handle_withdrawal_application, withdrawal_request);
+    } else {
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+    break;
+
 
 
 

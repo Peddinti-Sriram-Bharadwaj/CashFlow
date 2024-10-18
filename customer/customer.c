@@ -30,6 +30,9 @@ int main(int argc, char *argv[]) {
     char transferMoneyPath[256];
     snprintf(transferMoneyPath, sizeof(transferMoneyPath), "%s%s", basePath, "/customer/transferMoney.out");
 
+    char withdrawMoneyPath[256];
+    snprintf(withdrawMoneyPath, sizeof(withdrawMoneyPath), "%s%s", basePath, "/customer/withdrawMoney.out");
+
 
     printf("welcome to Cashflow dear user\n");
     printf("Hello %s\n", username);
@@ -59,6 +62,7 @@ int main(int argc, char *argv[]) {
             break;
         case 3:
             printf("Withdraw money\n");
+            execvp(withdrawMoneyPath, argv);
             break;
         case 4:
             printf("Transfer funds\n");
