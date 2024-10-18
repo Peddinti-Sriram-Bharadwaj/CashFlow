@@ -7,10 +7,22 @@
 #include <sodium.h> // Include libsodium header
 #include "../global.c"
 
-struct ManagerLogin{
-  char username[20];
-  char loggedin[2];
-  char hashed_password[crypto_pwhash_STRBYTES]; // Store the hashed password
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <stdlib.h>
+
+#define SOCKET_PATH "/tmp/server"
+#define BUFFER_SIZE 256
+
+struct ManagerLogin {
+    char username[20];
+    char loggedin[2];
+    char hashed_password[crypto_pwhash_STRBYTES]; // Store the hashed password
+};
+
+struct Operation {
+    char operation[20];
+    struct ManagerLogin manager;
 };
 
 void remove_newline(char *str) {
@@ -20,7 +32,12 @@ void remove_newline(char *str) {
     }
 }
 
-int main(){
+int main(int argc, char *argv[]) {
+    char ManagerLoginsPath[256];
+    snprintf(ManagerLoginsPath, sizeof(ManagerLoginsPath), "%s%s", basePath, "/Manager/managerlogins.txt");
+
+    char AdminActionsPath[256];
+    snprintf(AdminActionsPath, sizeof(AdminActionsPath), "%s%s", basePath, "/admin/admin.out");
     // Initialize libsodium
     if (sodium_init() < 0) {
         printf("libsodium initialization failed\n");
@@ -30,27 +47,34 @@ int main(){
     printf("Please enter the name of the Manager to be added\n");
     printf("Enter the username\n");
     char username[20], password[20];
-    fgets(username, 20, stdin);
+    fgets(username, sizeof(username), stdin);
     remove_newline(username);
-  
-    printf("Ask the Manager to create password\n");
-    fgets(password, 20, stdin); 
+
+    printf("Ask the Manager to create a password\n");
+    fgets(password, sizeof(password), stdin);
     remove_newline(password);
 
     // Hash the password
     struct ManagerLogin e;
-    if (crypto_pwhash_str(e.hashed_password, password, strlen(password), crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
+    if (crypto_pwhash_str(e.hashed_password, password, strlen(password), 
+                           crypto_pwhash_OPSLIMIT_INTERACTIVE, 
+                           crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
         printf("Password hashing failed\n");
         return 1;
     }
 
     // Store the username and hashed password
     strncpy(e.username, username, sizeof(e.username) - 1); // Ensure null-termination
-    strncpy(e.loggedin, "n", sizeof(e.loggedin));
+    strncpy(e.loggedin, "n", sizeof(e.loggedin) - 1);
 
-    // Write to the manager login file
-    char ManagerLoginsPath[256];
-    snprintf(ManagerLoginsPath, sizeof(ManagerLoginsPath), "%s%s", basePath, "/Manager/managerlogins.txt"); 
+    // Prepare the operation structure
+    struct Operation op;
+    strncpy(op.operation, "addmanager", sizeof(op.operation) - 1);
+    op.manager = e;
+
+    // Write to the manager login file (optional)
+    
+    
     int fd = open(ManagerLoginsPath, O_RDWR | O_APPEND | O_CREAT, 0644);
     if (fd == -1) {
         printf("Failed to open the file\n");
@@ -63,5 +87,30 @@ int main(){
 
     printf("Manager account created successfully\n");
 
-    return 0;
+    // Socket programming to send manager data to server
+    int sockfd;
+    struct sockaddr_un server_addr;
+
+    if ((sockfd = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1) {
+        perror("socket");
+        exit(1);
+    }
+
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sun_family = AF_UNIX;
+
+   // Set up socket path
+   strncpy(server_addr.sun_path, SOCKET_PATH, sizeof(server_addr.sun_path) - 1);
+
+   // Send the operation to the server
+   if (sendto(sockfd, &op, sizeof(op), 0, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
+       perror("sendto");
+       close(sockfd);
+       exit(1);
+   }
+
+   close(sockfd);
+   execvp(AdminActionsPath, argv);
+
+   return 0;
 }

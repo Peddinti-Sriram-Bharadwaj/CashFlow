@@ -25,6 +25,11 @@ struct Customer{
     int balance;
 };
 
+struct Operation{
+    char operation[20];
+    struct Customer customer;
+};
+
 void remove_newline(char *str) {
     size_t len = strlen(str);
     if (len > 0 && str[len - 1] == '\n') {
@@ -32,7 +37,7 @@ void remove_newline(char *str) {
     }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
     // Initialize libsodium
     if (sodium_init() < 0) {
         return 1; // Panic! The library couldn't be initialized
@@ -75,7 +80,10 @@ int main() {
     close(fd);
 
     struct Customer c;
+    struct Operation o;
     strncpy(c.username, username, sizeof(c.username) - 1);
+    strncpy(o.operation, "addcustomer", sizeof(o.operation) - 1);
+    o.customer = c;
     c.balance = 0;
 
     int sockfd;
@@ -91,7 +99,7 @@ int main() {
     strncpy(server_addr.sun_path, SOCKET_PATH, sizeof(server_addr.sun_path) - 1);
 
     //datagram client
-    if (sendto(sockfd, &c, sizeof(c), 0, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
+    if (sendto(sockfd, &o, sizeof(o), 0, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
         perror("sendto");
         close(sockfd);
         exit(1);
@@ -99,7 +107,7 @@ int main() {
 
     close(sockfd);
 
-    execvp(EmployeeActionsPath, NULL);
+    execvp(EmployeeActionsPath, argv);
 
     return 0;
 }

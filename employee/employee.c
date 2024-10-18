@@ -35,7 +35,7 @@ int main(int argc, char* argv[]){
   switch(option){
     case 1:
       printf("Add new customer\n");
-      execvp(AddCustomerPath, NULL);
+      execvp(AddCustomerPath, argv);
 
       break;
     case 2:

@@ -7,10 +7,22 @@
 #include <sodium.h> // Include libsodium header
 #include "../global.c"
 
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <stdlib.h>
+
+#define SOCKET_PATH "/tmp/server"
+#define BUFFER_SIZE 256
+
 struct EmployeeLogin {
     char username[20];
     char loggedin[2];
     char hashed_password[crypto_pwhash_STRBYTES]; // Store the hashed password
+};
+
+struct Operation {
+    char operation[20];
+    struct EmployeeLogin employee;
 };
 
 void remove_newline(char *str) {
@@ -20,10 +32,16 @@ void remove_newline(char *str) {
     }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+    char EmployeeLoginsPath[256];
+    snprintf(EmployeeLoginsPath, sizeof(EmployeeLoginsPath), "%s%s", basePath, "/employee/employeelogins.txt");
+
+    char AdminActionsPath[256];
+    snprintf(AdminActionsPath, sizeof(AdminActionsPath), "%s%s", basePath, "/admin/admin.out");
     // Initialize libsodium
     if (sodium_init() < 0) {
-        return 1; // Panic! The library couldn't be initialized
+        printf("libsodium initialization failed\n");
+        return 1;
     }
 
     printf("Please enter the name of the Employee to be added\n");
@@ -40,14 +58,22 @@ int main() {
     strcpy(e.username, username);
 
     // Hash the password
-    if (crypto_pwhash_str(e.hashed_password, password, strlen(password), crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
+    if (crypto_pwhash_str(e.hashed_password, password, strlen(password), 
+                           crypto_pwhash_OPSLIMIT_INTERACTIVE, 
+                           crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
         printf("Error hashing the password\n");
         return 1;
     }
+    
     strncpy(e.loggedin, "n", sizeof(e.loggedin) - 1);
 
-    char EmployeeLoginsPath[256];
-    snprintf(EmployeeLoginsPath, sizeof(EmployeeLoginsPath), "%s%s", basePath, "/employee/employeelogins.txt");
+    // Prepare the operation structure
+    struct Operation op;
+    strncpy(op.operation, "addemployee", sizeof(op.operation) - 1);
+    op.employee = e;
+
+    // Write to the employee login file (optional)
+
 
     int fd = open(EmployeeLoginsPath, O_RDWR | O_APPEND | O_CREAT, 0644);
     if (fd == -1) {
@@ -60,5 +86,31 @@ int main() {
 
     printf("Employee added successfully\n");
 
-    return 0;
+    // Socket programming to send employee data to server
+    int sockfd;
+    struct sockaddr_un server_addr;
+
+    if ((sockfd = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1) {
+        perror("socket");
+        exit(1);
+    }
+
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sun_family = AF_UNIX;
+    
+   // Set up socket path
+   strncpy(server_addr.sun_path, SOCKET_PATH, sizeof(server_addr.sun_path) - 1);
+
+   // Send the operation to the server
+   if (sendto(sockfd, &op, sizeof(op), 0, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
+       perror("sendto");
+       close(sockfd);
+       exit(1);
+   }
+
+   close(sockfd);
+
+    execvp(AdminActionsPath, argv);
+
+   return 0;
 }
