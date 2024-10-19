@@ -16,7 +16,6 @@ int main(int argc, char *argv[]) {
 
     char LogOutPath[256];
     snprintf(LogOutPath, sizeof(LogOutPath), "%s%s", basePath, "/customer/logout.out");
-    printf("t\n");
 
     char getBalancePath[256];
     snprintf(getBalancePath, sizeof(getBalancePath), "%s%s", basePath, "/customer/getBalance.out");
@@ -35,6 +34,12 @@ int main(int argc, char *argv[]) {
 
     char viewHistoryPath[256];
     snprintf(viewHistoryPath, sizeof(viewHistoryPath), "%s%s", basePath, "/customer/viewHistory.out");
+
+    char changePasswordPath[256];
+    snprintf(changePasswordPath, sizeof(changePasswordPath), "%s%s", basePath, "/customer/changePassword.out");
+
+    char feedbackPath[256];
+    snprintf(feedbackPath, sizeof(feedbackPath), "%s%s", basePath, "/customer/feedback.out");
 
 
     printf("welcome to Cashflow dear user\n");
@@ -77,9 +82,11 @@ int main(int argc, char *argv[]) {
             break;
         case 6:
             printf("Change password\n");
+            execvp(changePasswordPath, argv);
             break;
         case 7:
             printf("Adding feedback\n");
+            execvp(feedbackPath, argv);
             break;
         case 8:
             printf("View Transaction History\n");

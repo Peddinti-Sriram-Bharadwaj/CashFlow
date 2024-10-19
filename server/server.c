@@ -16,6 +16,8 @@ pthread_mutex_t admin_file_mutex = PTHREAD_MUTEX_INITIALIZER;  // Mutex to synch
 pthread_mutex_t employee_file_mutex = PTHREAD_MUTEX_INITIALIZER;  // Mutex to synchronize file access for employees
 pthread_mutex_t manager_file_mutex = PTHREAD_MUTEX_INITIALIZER;  // Mutex to synchronize file access for managers
 pthread_mutex_t loan_application_file_mutex = PTHREAD_MUTEX_INITIALIZER;  // Mutex to synchronize file access for loan applications
+// Mutex for file operations
+pthread_mutex_t feedback_file_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
 
@@ -111,6 +113,16 @@ struct Passbook {
 struct PassbookRequest {
     char username[20];   // Username of the customer whose passbook is requested
     int client_sockfd;   // Socket file descriptor to send the passbook to the client
+};
+
+struct FeedbackRequest {
+    char username[20];
+    int client_sockfd; // Client socket file descriptor
+};
+
+struct Feedback {
+    char username[20];
+    char feedback[101]; // Feedback field with max length of 100 chars + null terminator
 };
 
 // Function to handle adding a customer
@@ -906,6 +918,81 @@ void *getpassbook(void *arg) {
     pthread_exit(NULL);
 }
 
+void *handle_feedback_request(void *arg) {
+    struct FeedbackRequest *request = (struct FeedbackRequest *)arg;
+    int client_sockfd = request->client_sockfd;
+
+    // Step 1: Send "feedback" prompt to the client
+    char send_message[] = "feedback";
+    ssize_t num_bytes_sent = send(client_sockfd, send_message, sizeof(send_message), 0);
+    if (num_bytes_sent == -1) {
+        perror("send");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    // Step 2: Receive feedback from the client
+    struct Feedback feedback;
+    strncpy(feedback.username, request->username, sizeof(feedback.username) - 1);
+    feedback.username[sizeof(feedback.username) - 1] = '\0'; // Null-terminate
+
+    // Receive the feedback
+    ssize_t num_bytes_received = recv(client_sockfd, feedback.feedback, sizeof(feedback.feedback), 0);
+    if (num_bytes_received == -1) {
+        perror("recv");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    // Ensure null-termination
+    feedback.feedback[sizeof(feedback.feedback) - 1] = '\0'; // Null-terminate
+    // Optionally, truncate feedback if it's longer than 100 characters
+    if (strlen(feedback.feedback) > 100) {
+        feedback.feedback[100] = '\0';
+    }
+
+    // Step 3: Lock the mutex before accessing the feedback file
+    pthread_mutex_lock(&feedback_file_mutex);
+
+    // Write the structure to the feedbacks.txt file
+    FILE *file = fopen("feedbacks.txt", "ab");
+    if (file == NULL) {
+        perror("fopen");
+        pthread_mutex_unlock(&feedback_file_mutex);  // Unlock before exiting
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    if (fwrite(&feedback, sizeof(struct Feedback), 1, file) != 1) {
+        perror("fwrite");
+        fclose(file);
+
+        // Send failure response to the client
+        int failure_message = -1;
+        send(client_sockfd, &failure_message, sizeof(failure_message), 0);
+
+        pthread_mutex_unlock(&feedback_file_mutex);  // Unlock before exiting
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    fclose(file);
+
+    // Step 4: Send success message to the client
+    int success_message = 1;
+    ssize_t success_bytes_sent = send(client_sockfd, &success_message, sizeof(success_message), 0);
+    if (success_bytes_sent == -1) {
+        perror("send");
+    }
+
+    // Step 5: Unlock the mutex after the file operation is complete
+    pthread_mutex_unlock(&feedback_file_mutex);
+
+    // Step 6: Clean up and exit the thread
+    close(client_sockfd);
+    pthread_exit(NULL);
+}
+
 
 
 
@@ -1120,7 +1207,28 @@ void *handle_client(void *arg) {
         }
     break;
 
+case 'f': // New case for feedback submission
+    if (strcmp(operation.operation, "feedbackSubmission") == 0) {
+        struct FeedbackRequest *feedback_request = malloc(sizeof(struct FeedbackRequest));
+        if (feedback_request == NULL) {
+            perror("malloc");
+            close(client_sockfd);
+            pthread_exit(NULL);
+        }
 
+        // Copy username from the operation data
+        memcpy(feedback_request->username, operation.data.customer.username, sizeof(feedback_request->username));
+        feedback_request->client_sockfd = client_sockfd;
+
+        // Create a thread to handle feedback submission
+        pthread_create(&thread_id, NULL, handle_feedback_request, feedback_request);
+    } else {
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+    break;
+
+// The rest of your server code continues here...
 
 
 

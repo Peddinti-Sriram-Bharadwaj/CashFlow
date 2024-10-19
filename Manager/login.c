@@ -44,7 +44,6 @@ int main() {
     fgets(username, sizeof(username), stdin);
     remove_newline(username);
     
-    
 
     // Open the file containing the manager logins
     fd = open(ManagerLoginsPath, O_RDONLY);

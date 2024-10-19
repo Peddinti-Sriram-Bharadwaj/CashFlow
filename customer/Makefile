@@ -1,4 +1,4 @@
-all: signup.out loginpage.out login.out customer.out logout.out getBalance.out loanApplication.out depositMoney.out transferMoney.out withdrawMoney.out viewHistory.out
+all: signup.out loginpage.out login.out customer.out logout.out getBalance.out loanApplication.out depositMoney.out transferMoney.out withdrawMoney.out viewHistory.out changePassword.out feedback.out
 
 signup.out: signup.c
 	gcc signup.c -o signup.out
@@ -37,5 +37,10 @@ viewHistory.out: viewHistory.c
 updateUsername.out: updateUsername.c
 	gcc updateUsername.c -o updateUsername.out
 
+changePassword.out: changePassword.c
+	gcc changePassword.c -o changePassword.out -I/opt/homebrew/Cellar/libsodium/1.0.20/include -L/opt/homebrew/Cellar/libsodium/1.0.20/lib -lsodium
+
+feedback.out: feedback.c
+	gcc feedback.c -o feedback.out
 clean:
 	rm -f *.out
