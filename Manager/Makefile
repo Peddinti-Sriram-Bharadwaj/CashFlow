@@ -1,4 +1,4 @@
-all: login.out manager.out logout.out viewLoans.out
+all: login.out manager.out logout.out viewLoans.out viewEmployees.out
 
 login.out: login.c
 	gcc -o login.out login.c -I/opt/homebrew/Cellar/libsodium/1.0.20/include -L/opt/homebrew/Cellar/libsodium/1.0.20/lib -lsodium
@@ -12,3 +12,6 @@ logout.out: logout.c
 
 viewLoans.out: viewLoans.c
 	gcc -o viewLoans.out viewLoans.c 
+
+viewEmployees.out: viewEmployees.c
+	gcc -o viewEmployees.out viewEmployees.c

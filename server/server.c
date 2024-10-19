@@ -129,6 +129,11 @@ struct Feedback {
     char feedback[101]; // Feedback field with max length of 100 chars + null terminator
 };
 
+struct EmployeeRequest {
+    char username[20];
+    int client_sockfd; // Client socket file descriptor
+};
+
 // Function to handle adding a customer
 void *addcustomer(void *arg) {
     struct Customer *customer = (struct Customer *)arg;
@@ -1072,6 +1077,55 @@ void *handle_list_pending_loan_applications(void *arg) {
     pthread_exit(NULL);
 }
 
+// Function to handle listing employees with at least one None in processing_usernames
+void *handle_pending_employees(void *arg) {
+    struct LoanRequest *request = (struct LoanRequest *)arg;
+    int client_sockfd = request->client_sockfd;
+
+    FILE *file = fopen("employees.txt", "rb");
+    if (file == NULL) {
+        perror("fopen");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    struct Employee employee;
+    int pending_count = 0;
+
+    // First pass: Count employees with at least one "None"
+    while (fread(&employee, sizeof(struct Employee), 1, file) == 1) {
+        for (int i = 0; i < MAX_EMPLOYEES; i++) {
+            if (strcmp(employee.processing_usernames[i], "None") == 0) {
+                pending_count++;
+                break; // No need to check other usernames for this employee
+            }
+        }
+    }
+
+    // Send the count of pending employees to the client
+    send(client_sockfd, &pending_count, sizeof(pending_count), 0);
+    
+    // Reset file pointer to the beginning for the second pass
+    fseek(file, 0, SEEK_SET);
+
+    // Second pass: Send each employee with at least one "None" to the client
+    while (fread(&employee, sizeof(struct Employee), 1, file) == 1) {
+        for (int i = 0; i < MAX_EMPLOYEES; i++) {
+            if (strcmp(employee.processing_usernames[i], "None") == 0) {
+                // Send employee details to the client
+                send(client_sockfd, &employee, sizeof(struct Employee), 0);
+                int ack;
+                recv(client_sockfd, &ack, sizeof(ack), 0); // Wait for acknowledgment
+                break; // No need to check other usernames for this employee
+            }
+        }
+    }
+
+    fclose(file);
+    close(client_sockfd);
+    pthread_exit(NULL);
+}
+
 
 void *handle_client(void *arg) {
     int client_sockfd = *(int *)arg;
@@ -1306,7 +1360,7 @@ case 'f': // New case for feedback submission
     }
     break;
 
-    case 'p': // New case for listing pending applications
+    case 'p': // Case for listing pending applications and pending employees
     if (strcmp(operation.operation, "pending") == 0) {
         struct LoanRequest *loan_request = malloc(sizeof(struct LoanRequest));
         if (loan_request == NULL) {
@@ -1315,13 +1369,28 @@ case 'f': // New case for feedback submission
             pthread_exit(NULL);
         }
 
-
         memcpy(&loan_request->username, &operation.data.customer.username, sizeof(struct Customer));
         loan_request->client_sockfd = client_sockfd;
 
+        // Create a thread to handle listing pending loan applications
         pthread_create(&thread_id, NULL, handle_list_pending_loan_applications, loan_request);
     } 
-    break; // End of pending applications case
+    else if (strcmp(operation.operation, "pendingEmployees") == 0) {
+        struct EmployeeRequest *employee_request = malloc(sizeof(struct EmployeeRequest));
+        if (employee_request == NULL) {
+            perror("malloc");
+            close(client_sockfd);
+            pthread_exit(NULL);
+        }
+
+        // No specific user data is needed for this operation, just pass the socket
+        employee_request->client_sockfd = client_sockfd;
+
+        // Create a thread to handle listing employees with at least one "None"
+        pthread_create(&thread_id, NULL, handle_pending_employees, employee_request);
+    }
+    break; // End of pending applications and employees case
+
 
 
 
