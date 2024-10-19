@@ -1126,6 +1126,114 @@ void *handle_pending_employees(void *arg) {
     pthread_exit(NULL);
 }
 
+void *handle_assign_loan_to_employee(void *arg) {
+    int client_sockfd = *(int *)arg;
+    printf("Going to assign loan to employee\n");
+
+    // Step 1: Ask the client for the loan applicant's username
+    char keyword[] = "applicant";
+    send(client_sockfd, keyword, sizeof(keyword), 0);
+    
+    char loan_applicant_username[20];
+    recv(client_sockfd, loan_applicant_username, sizeof(loan_applicant_username), 0);
+    printf("Received loan applicant username: %s\n", loan_applicant_username);
+
+    FILE *loan_file = fopen("loanApplications.txt", "r+b");
+    if (!loan_file) {
+        perror("fopen loanApplications");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    struct LoanApplication loan_app;
+    int loan_found = 0;
+
+    // Check if the loan applicant exists and has a "None" employee assigned
+    while (fread(&loan_app, sizeof(struct LoanApplication), 1, loan_file) == 1) {
+        if (strcmp(loan_app.username, loan_applicant_username) == 0 && strcmp(loan_app.assigned_employee, "None") == 0) {
+            loan_found = 1;
+            break;
+        }
+    }
+
+    if (!loan_found) {
+        printf("Loan application for %s not found or already assigned.\n", loan_applicant_username);
+        fclose(loan_file);
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    // Step 2: Ask the client for the employee's username
+    strcpy(keyword, "employee");
+    send(client_sockfd, keyword, sizeof(keyword), 0);
+
+    char employee_username[20];
+    recv(client_sockfd, employee_username, sizeof(employee_username), 0);
+    printf("Received employee username: %s\n", employee_username);
+
+    FILE *employee_file = fopen("employees.txt", "r+b");
+    if (!employee_file) {
+        perror("fopen employees");
+        fclose(loan_file);
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    struct Employee employee;
+    int employee_found = 0;
+    int loan_assigned = 0;
+
+    // Check if the employee exists and has space in the processing_usernames array
+    while (fread(&employee, sizeof(struct Employee), 1, employee_file) == 1) {
+        if (strcmp(employee.username, employee_username) == 0) {
+            employee_found = 1;
+            for (int i = 0; i < 5; i++) {
+                if (strcmp(employee.processing_usernames[i], "None") == 0) {
+                    // Assign the loan applicant to the employee
+                    strncpy(loan_app.assigned_employee, employee_username, 20 - 1);
+                    loan_app.assigned_employee[20 - 1] = '\0';
+
+                    // Update the loan application
+                    fseek(loan_file, -sizeof(struct LoanApplication), SEEK_CUR);
+                    fwrite(&loan_app, sizeof(struct LoanApplication), 1, loan_file);
+                    fflush(loan_file);
+
+                    // Update the employee processing usernames
+                    strncpy(employee.processing_usernames[i], loan_applicant_username, 20 - 1);
+                    employee.processing_usernames[i][20 - 1] = '\0';
+
+                    // Update the employee file
+                    fseek(employee_file, -sizeof(struct Employee), SEEK_CUR);
+                    fwrite(&employee, sizeof(struct Employee), 1, employee_file);
+                    fflush(employee_file);
+
+                    loan_assigned = 1;
+                    break;
+                }
+            }
+            break;
+        }
+    }
+
+    fclose(loan_file);
+    fclose(employee_file);
+
+    // Step 3: Send result of the operation to the client
+    if (loan_assigned) {
+        char success_msg[] = "Loan successfully assigned!";
+        send(client_sockfd, success_msg, sizeof(success_msg), 0);
+    } else if (!employee_found) {
+        char fail_msg[] = "Employee not found!";
+        send(client_sockfd, fail_msg, sizeof(fail_msg), 0);
+    } else {
+        char fail_msg[] = "Employee cannot take more loans!";
+        send(client_sockfd, fail_msg, sizeof(fail_msg), 0);
+    }
+
+    close(client_sockfd);
+    pthread_exit(NULL);
+}
+
 
 void *handle_client(void *arg) {
     int client_sockfd = *(int *)arg;
@@ -1183,11 +1291,39 @@ void *handle_client(void *arg) {
                 memcpy(manager_copy, &operation.data.manager, sizeof(struct Manager));
                 pthread_create(&thread_id, NULL, addmanager, manager_copy);
 
-            } else {
+            } 
+            else if (strcmp(operation.operation, "assignLoan") == 0) {
+            printf("Assigning loan to employee (switch)\n");
+
+            // Allocate memory for the socket descriptor and pass it to the thread
+            int *sockfd_ptr = malloc(sizeof(int));
+            if (sockfd_ptr == NULL) {
+                perror("malloc");
                 close(client_sockfd);
                 pthread_exit(NULL);
             }
-            break;
+
+            *sockfd_ptr = client_sockfd;
+            pthread_t thread_id;
+
+            // Create a new thread to handle loan assignment
+            if (pthread_create(&thread_id, NULL, handle_assign_loan_to_employee, sockfd_ptr) != 0) {
+                perror("pthread_create");
+                free(sockfd_ptr); // Free the allocated memory if thread creation fails
+                close(client_sockfd);
+                pthread_exit(NULL);
+            }
+
+            // Optionally detach the thread to avoid resource leakage
+            pthread_detach(thread_id);
+        }
+        else {
+            printf("Unknown operation. Closing connection.\n");
+            close(client_sockfd);
+            pthread_exit(NULL);
+        }
+        break;
+
 
         case 'g':
             if (strcmp(operation.operation, "getbalance") == 0) {

@@ -20,6 +20,9 @@ int main(int argc, char* argv[]) {
   char viewEmployeesPath[256];
   snprintf(viewEmployeesPath, sizeof(viewEmployeesPath), "%s%s", basePath, "/Manager/viewEmployees.out");
 
+  char assignLoanPath[256];
+  snprintf(assignLoanPath, sizeof(assignLoanPath), "%s%s", basePath, "/Manager/assignLoan.out");
+
 
 
   char* username = argv[0];
@@ -53,6 +56,7 @@ int main(int argc, char* argv[]) {
       break;
     case 4:
       printf("assign loan application\n");
+      execvp(assignLoanPath, argv);
       break;
     case 5:
       printf("review customer feedback\n");
