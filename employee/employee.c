@@ -20,6 +20,9 @@ int main(int argc, char* argv[]){
   
   char updateUsernamePath[256];
     snprintf(updateUsernamePath, sizeof(updateUsernamePath), "%s%s", basePath, "/employee/updateUsername.out");
+  
+  char viewLoanApplicationsPath[256];
+    snprintf(viewLoanApplicationsPath, sizeof(viewLoanApplicationsPath), "%s%s", basePath, "/employee/viewLoans.out");
 
   printf("Welcome to the workspace dear employee\n");
   printf("Hello %s\n", username);
@@ -47,13 +50,14 @@ int main(int argc, char* argv[]){
       printf("Modify customer details\n");
       execvp(updateUsernamePath, argv);
       break;
-case 3:
+    case 3:
       printf("Process loan application\n");
       break;
     case 4:
       printf("Approve/Reject loans\n");
     case 5:
       printf("View assigned loan applications\n");
+      execvp(viewLoanApplicationsPath, argv);
       break;
     case 6:
       printf("View customer Transactions\n");

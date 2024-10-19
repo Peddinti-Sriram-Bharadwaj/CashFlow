@@ -134,6 +134,11 @@ struct EmployeeRequest {
     int client_sockfd; // Client socket file descriptor
 };
 
+struct EmployeeLoanRequest {
+    char employee_username[20]; // Employee's username
+    int client_sockfd;          // Client socket descriptor
+};
+
 // Function to handle adding a customer
 void *addcustomer(void *arg) {
     struct Customer *customer = (struct Customer *)arg;
@@ -1234,6 +1239,68 @@ void *handle_assign_loan_to_employee(void *arg) {
     pthread_exit(NULL);
 }
 
+void *handle_get_employee_loans(void *arg) {
+    struct EmployeeLoanRequest *loan_request = (struct EmployeeLoanRequest *)arg;
+    int client_sockfd = loan_request->client_sockfd;
+    char employee_username[20];
+    strcpy(employee_username, loan_request->employee_username); // Copy employee username
+    free(loan_request); // Free the loan request structure
+
+    // Step 2: Open employees.txt and loanApplications.txt
+    FILE *employee_file = fopen("employees.txt", "rb");
+    FILE *loan_file = fopen("loanApplications.txt", "rb");
+    if (!employee_file || !loan_file) {
+        perror("File open error");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    // Step 3: Find the employee in the employees.txt file
+    struct Employee employee;
+    int employee_found = 0;
+    while (fread(&employee, sizeof(struct Employee), 1, employee_file) == 1) {
+        if (strcmp(employee.username, employee_username) == 0) {
+            employee_found = 1;
+            break;
+        }
+    }
+
+    if (!employee_found) {
+        printf("Employee %s not found.\n", employee_username);
+        close(client_sockfd);
+        fclose(employee_file);
+        fclose(loan_file);
+        pthread_exit(NULL);
+    }
+
+    // Step 4: Count how many loans are assigned to this employee
+    struct LoanApplication loan_app;
+    int loan_count = 0;
+    struct LoanApplication assigned_loans[5]; // Store up to 5 loans
+
+    while (fread(&loan_app, sizeof(struct LoanApplication), 1, loan_file) == 1) {
+        for (int i = 0; i < 5; i++) {
+            if (strcmp(loan_app.assigned_employee, employee_username) == 0 &&
+                strcmp(employee.processing_usernames[i], loan_app.username) == 0) {
+                assigned_loans[loan_count++] = loan_app;
+            }
+        }
+    }
+
+    // Step 5: Send the number of loans back to the client
+    send(client_sockfd, &loan_count, sizeof(loan_count), 0);
+
+    // Step 6: Send each loan's details one by one
+    for (int i = 0; i < loan_count; i++) {
+        send(client_sockfd, &assigned_loans[i], sizeof(struct LoanApplication), 0);
+    }
+
+    // Close the files and socket
+    fclose(employee_file);
+    fclose(loan_file);
+    close(client_sockfd);
+    pthread_exit(NULL);
+}
 
 void *handle_client(void *arg) {
     int client_sockfd = *(int *)arg;
@@ -1338,6 +1405,22 @@ void *handle_client(void *arg) {
                 balance_request->client_sockfd = client_sockfd;
 
                 pthread_create(&thread_id, NULL, getbalance, balance_request);
+            } if (strcmp(operation.operation, "getEmployeeLoans") == 0) {
+                // Create a structure to hold employee data and socket information
+                struct EmployeeLoanRequest *loan_request = malloc(sizeof(struct EmployeeLoanRequest));
+                if (loan_request == NULL) {
+                    perror("malloc");
+                    close(client_sockfd);
+                    pthread_exit(NULL);
+                }
+
+                // Copy the employee username from the operation data
+                memcpy(loan_request->employee_username, operation.data.customer.username, sizeof(operation.data.customer.username));
+                loan_request->client_sockfd = client_sockfd;
+
+                // Create a thread to handle fetching the employee's assigned loans
+                pthread_create(&thread_id, NULL, handle_get_employee_loans, loan_request);
+                pthread_detach(thread_id); // Detach the thread to handle it independently
             } else {
                 close(client_sockfd);
                 pthread_exit(NULL);
