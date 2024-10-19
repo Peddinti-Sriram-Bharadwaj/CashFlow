@@ -5,16 +5,13 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
-#include "../global.c"
-
 #define SOCKET_PATH "/tmp/server"
-#define BUFFER_SIZE 256
+#include "../global.c" // Include your global variables and definitions
 
+// Structure for the operation the client sends
 struct Operation {
-    char operation[20];
-    union {
-        char username[20]; // For balance retrieval
-    } data;
+    char operation[20];  // Operation type (getbalance)
+    char username[20];   // Username of the customer
 };
 
 int main(int argc, char *argv[]) {
@@ -49,25 +46,22 @@ int main(int argc, char *argv[]) {
 
     // Prepare the operation to get balance for a specific user
     strcpy(operation.operation, "getbalance");
-    
-    // Copy username into operation data
-    strncpy(operation.data.username, username, sizeof(operation.data.username) - 1);
-    operation.data.username[sizeof(operation.data.username) - 1] = '\0'; // Null-terminate
+    strncpy(operation.username, username, sizeof(operation.username) - 1);
+    operation.username[sizeof(operation.username) - 1] = '\0'; // Null-terminate
 
     // Send request to server
     ssize_t num_bytes = send(sockfd, &operation, sizeof(operation), 0);
-
     if (num_bytes == -1) {
         perror("send");
         close(sockfd);
         exit(1);
     }
 
+    printf("Waiting for balance response...\n");
+
     // Receive the response from the server (balance or error)
     int balance;
-    
     num_bytes = recv(sockfd, &balance, sizeof(balance), 0);
-    
     if (num_bytes == -1) {
         perror("recv");
         close(sockfd);
@@ -76,17 +70,13 @@ int main(int argc, char *argv[]) {
 
     // Process the balance or user not found error
     if (balance == -1) {
-        printf("User %s not found.\n", operation.data.username);
-        fflush(stdout); // Ensure output is printed immediately
+        printf("User %s not found.\n", username);
     } else {
-        printf("Balance for user %s: %d\n", operation.data.username, balance);
-        fflush(stdout); // Ensure output is printed immediately
+        printf("Balance for user %s: %d\n", username, balance);
     }
 
     // Close the socket
     close(sockfd);
-        execvp(CustomerActionsPath, argv);
-        perror("execvp failed");
-
+    execvp(CustomerActionsPath, argv); // Execute the customer actions program
     return 0; // Exit successfully
 }

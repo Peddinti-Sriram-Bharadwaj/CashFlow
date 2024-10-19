@@ -23,6 +23,9 @@ int main(int argc, char* argv[]){
   
   char viewLoanApplicationsPath[256];
     snprintf(viewLoanApplicationsPath, sizeof(viewLoanApplicationsPath), "%s%s", basePath, "/employee/viewLoans.out");
+  
+  char loanApprovalPath[256];
+    snprintf(loanApprovalPath, sizeof(loanApprovalPath), "%s%s", basePath, "/employee/loan.out");
 
   printf("Welcome to the workspace dear employee\n");
   printf("Hello %s\n", username);
@@ -55,6 +58,8 @@ int main(int argc, char* argv[]){
       break;
     case 4:
       printf("Approve/Reject loans\n");
+      execvp(loanApprovalPath, argv);
+
     case 5:
       printf("View assigned loan applications\n");
       execvp(viewLoanApplicationsPath, argv);

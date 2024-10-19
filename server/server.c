@@ -139,6 +139,12 @@ struct EmployeeLoanRequest {
     int client_sockfd;          // Client socket descriptor
 };
 
+struct LoanApprovalRequest {
+    char username[20];  // Customer's username
+    int amount;         // Amount of the loan
+};
+
+
 // Function to handle adding a customer
 void *addcustomer(void *arg) {
     struct Customer *customer = (struct Customer *)arg;
@@ -288,16 +294,26 @@ void *addmanager(void *arg) {
 
 void *getbalance(void *arg) {
     struct BalanceRequest *request = (struct BalanceRequest *)arg;
-    struct Customer *customer = &request->customer;
     int client_sockfd = request->client_sockfd;
 
-    // Lock the mutex before accessing the file
-    pthread_mutex_lock(&customer_file_mutex);
+    // Validate socket descriptor before proceeding
+    printf("Client socket descriptor: %d\n", client_sockfd);
+    if (client_sockfd < 0) {
+        fprintf(stderr, "Invalid socket descriptor\n");
+        free(request); // Free memory before exiting
+        pthread_exit(NULL);
+    }
 
+    // Log the request details
+    printf("Getting balance for customer: %s\n", request->customer.username);
+
+    // Lock the mutex for safe file access
+    pthread_mutex_lock(&customer_file_mutex);
     FILE *file = fopen("customers.txt", "rb");
     if (file == NULL) {
-        perror("fopen");
-        pthread_mutex_unlock(&customer_file_mutex);  // Unlock before exiting
+        perror("Failed to open customers.txt");
+        pthread_mutex_unlock(&customer_file_mutex); // Unlock before exiting
+        free(request); // Free memory before exiting
         pthread_exit(NULL);
     }
 
@@ -306,23 +322,46 @@ void *getbalance(void *arg) {
 
     // Search for the customer in the file
     while (fread(&temp_customer, sizeof(struct Customer), 1, file) == 1) {
-        if (strcmp(temp_customer.username, customer->username) == 0) {
+        if (strcmp(temp_customer.username, request->customer.username) == 0) {
+            printf("Found customer: %s with balance: %d\n", temp_customer.username, temp_customer.balance);
             found = 1;
 
+            // Attempt to send the balance
+            printf("Attempting to send balance: %d to socket: %d\n", temp_customer.balance, client_sockfd);
             ssize_t num_bytes_sent = send(client_sockfd, &temp_customer.balance, sizeof(temp_customer.balance), 0);
+            printf("%d\n", (int)num_bytes_sent);
             if (num_bytes_sent == -1) {
                 perror("send");
+                // Handle the error appropriately here
             }
             break;
         }
     }
-    fclose(file);
 
-    // Unlock the mutex after the file operation is complete
-    pthread_mutex_unlock(&customer_file_mutex);
+    // Check if customer was found
+    if (!found) {
+        int not_found = -1; // Indicate user not found
+        printf("Customer not found, sending -1 to client.\n");
+        ssize_t num_bytes_sent = send(client_sockfd, &not_found, sizeof(not_found), 0);
+        printf("%d\n", (int)num_bytes_sent);
+        if (num_bytes_sent == -1) {
+            perror("send");
+            // Handle the error appropriately here
+        }
+    }
 
+    fclose(file); // Close the file
+    pthread_mutex_unlock(&customer_file_mutex); // Unlock after file access
+
+    // Free allocated memory for the request
+    free(request); // Make sure to free the allocated memory for request
+
+    close(client_sockfd); // Close the client socket
     pthread_exit(NULL);
 }
+
+
+
 
 void *handle_loan_application(void *arg) {
     struct LoanRequest *request = (struct LoanRequest *)arg;
@@ -556,6 +595,12 @@ void *handle_deposit_application(void *arg) {
     struct DepositRequest *request = (struct DepositRequest *)arg;
     int client_sockfd = request->client_sockfd;
 
+    // Check for valid socket descriptor
+    if (client_sockfd < 0) {
+        fprintf(stderr, "Invalid socket descriptor\n");
+        pthread_exit(NULL);
+    }
+
     // Step 1: Send "amount" prompt to the client
     char send_message[] = "amount";
     ssize_t num_bytes_sent = send(client_sockfd, send_message, sizeof(send_message), 0);
@@ -568,7 +613,7 @@ void *handle_deposit_application(void *arg) {
     // Step 2: Receive the deposit amount from the client
     int deposit_amount;
     ssize_t num_bytes_received = recv(client_sockfd, &deposit_amount, sizeof(deposit_amount), 0);
-    if (num_bytes_received == -1) {
+    if (num_bytes_received <= 0) { // Handle connection closed or error
         perror("recv");
         close(client_sockfd);
         pthread_exit(NULL);
@@ -598,12 +643,12 @@ void *handle_deposit_application(void *arg) {
             fseek(file, -sizeof(struct Customer), SEEK_CUR);
             fwrite(&temp_customer, sizeof(struct Customer), 1, file);
 
-            // Now, update the customer's passbook with the deposit transaction
+            // Update the customer's passbook with the deposit transaction
             FILE *transaction_file = fopen("transactions.txt", "r+b");
             if (transaction_file == NULL) {
                 perror("fopen transactions.txt");
                 fclose(file);
-                pthread_mutex_unlock(&customer_file_mutex);  // Unlock before exiting
+                pthread_mutex_unlock(&customer_file_mutex);
                 close(client_sockfd);
                 pthread_exit(NULL);
             }
@@ -620,7 +665,7 @@ void *handle_deposit_application(void *arg) {
                     struct Transaction deposit_transaction;
                     strcpy(deposit_transaction.type, "Deposit");
                     deposit_transaction.amount = deposit_amount;
-                    strcpy(deposit_transaction.date, "2024-10-19"); // You can set the actual date here
+                    strcpy(deposit_transaction.date, "2024-10-19"); // Set the actual date
                     strcpy(deposit_transaction.from_username, request->username);
                     strcpy(deposit_transaction.to_username, request->username);
 
@@ -657,8 +702,6 @@ void *handle_deposit_application(void *arg) {
     close(client_sockfd);
     pthread_exit(NULL);
 }
-
-
 
 void *handle_transfer_money(void *arg) {
     struct TransferRequest *request = (struct TransferRequest *)arg;
@@ -747,6 +790,62 @@ void *handle_transfer_money(void *arg) {
                             break;
                         }
                     }
+
+                    // Step 8: Update passbook for both sender and receiver
+                    FILE *transaction_file = fopen("transactions.txt", "r+b");
+                    if (transaction_file == NULL) {
+                        perror("fopen transactions.txt");
+                        pthread_mutex_unlock(&customer_file_mutex); // Unlock before exiting
+                        fclose(file);
+                        close(client_sockfd);
+                        pthread_exit(NULL);
+                    }
+
+                    struct Passbook passbook;
+                    // Update sender's passbook
+                    while (fread(&passbook, sizeof(struct Passbook), 1, transaction_file) == 1) {
+                        if (strcmp(passbook.username, username) == 0) {
+                            // Create a new transaction record for sender
+                            struct Transaction sender_transaction;
+                            strcpy(sender_transaction.type, "Transfer Out");
+                            sender_transaction.amount = transfer_amount;
+                            strcpy(sender_transaction.date, "2024-10-19"); // Use actual date here
+                            strcpy(sender_transaction.from_username, username);
+                            strcpy(sender_transaction.to_username, to_username);
+
+                            // Add the transaction to the sender's passbook
+                            passbook.transactions[passbook.num_transactions++] = sender_transaction;
+
+                            // Seek back and update the passbook record
+                            fseek(transaction_file, -sizeof(struct Passbook), SEEK_CUR);
+                            fwrite(&passbook, sizeof(struct Passbook), 1, transaction_file);
+                            break;
+                        }
+                    }
+
+                    // Now update receiver's passbook
+                    fseek(transaction_file, 0, SEEK_SET); // Reset to beginning of transaction file
+                    while (fread(&passbook, sizeof(struct Passbook), 1, transaction_file) == 1) {
+                        if (strcmp(passbook.username, to_username) == 0) {
+                            // Create a new transaction record for receiver
+                            struct Transaction receiver_transaction;
+                            strcpy(receiver_transaction.type, "Transfer In");
+                            receiver_transaction.amount = transfer_amount;
+                            strcpy(receiver_transaction.date, "2024-10-19"); // Use actual date here
+                            strcpy(receiver_transaction.from_username, username);
+                            strcpy(receiver_transaction.to_username, to_username);
+
+                            // Add the transaction to the receiver's passbook
+                            passbook.transactions[passbook.num_transactions++] = receiver_transaction;
+
+                            // Seek back and update the passbook record
+                            fseek(transaction_file, -sizeof(struct Passbook), SEEK_CUR);
+                            fwrite(&passbook, sizeof(struct Passbook), 1, transaction_file);
+                            break;
+                        }
+                    }
+
+                    fclose(transaction_file); // Close the transaction file
                 } else {
                     // Insufficient balance for sender
                     break;
@@ -915,19 +1014,20 @@ void *getpassbook(void *arg) {
             ssize_t num_bytes_sent = send(client_sockfd, &passbook, sizeof(passbook), 0);
             if (num_bytes_sent == -1) {
                 perror("send");
+                // Close socket and exit thread if the send failed
+                close(client_sockfd);
+                pthread_mutex_unlock(&customer_file_mutex); // Unlock before exiting
+                pthread_exit(NULL);
             }
             break;
         }
     }
 
     fclose(file);
-
-    // Unlock the mutex after the file operation is complete
-    pthread_mutex_unlock(&customer_file_mutex);
+    pthread_mutex_unlock(&customer_file_mutex); // Unlock the mutex after the file operation is complete
 
     // If passbook not found, send an error message
     if (!found) {
-        // Optionally send an error response to the client
         int response = -1;
         ssize_t num_bytes_sent = send(client_sockfd, &response, sizeof(response), 0);
         if (num_bytes_sent == -1) {
@@ -935,8 +1035,11 @@ void *getpassbook(void *arg) {
         }
     }
 
+    // Close the socket if no longer needed
+    close(client_sockfd);
     pthread_exit(NULL);
 }
+
 
 void *handle_feedback_request(void *arg) {
     struct FeedbackRequest *request = (struct FeedbackRequest *)arg;
@@ -1302,6 +1405,246 @@ void *handle_get_employee_loans(void *arg) {
     pthread_exit(NULL);
 }
 
+void *handle_loan_approval(void *arg) {
+    struct EmployeeLoanRequest *loan_request = (struct EmployeeLoanRequest *)arg;
+    int client_sockfd = loan_request->client_sockfd;
+    char employee_username[20];
+    strncpy(employee_username, loan_request->employee_username, sizeof(employee_username) - 1);
+    employee_username[sizeof(employee_username) - 1] = '\0'; // Ensure null-termination
+    free(loan_request);
+
+    // Step 1: Send request for customer username
+    if (send(client_sockfd, "username", sizeof("username"), 0) == -1) {
+        perror("send error");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+    
+    // Step 2: Receive the customer's username
+    char customer_username[20];
+    if (recv(client_sockfd, customer_username, sizeof(customer_username), 0) <= 0) {
+        perror("recv error");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    // Step 3: Open loanApplications.txt to find the loan
+    FILE *loan_file = fopen("loanApplications.txt", "rb+");
+    if (!loan_file) {
+        perror("File open error");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    struct LoanApplication loan_app;
+    int loan_found = 0;
+
+    // Step 4: Find the loan for the customer
+    while (fread(&loan_app, sizeof(struct LoanApplication), 1, loan_file) == 1) {
+        if (strcmp(loan_app.username, customer_username) == 0) {
+            loan_found = 1;
+            break;
+        }
+    }
+
+    if (!loan_found) {
+        printf("Loan for customer %s not found.\n", customer_username);
+        fclose(loan_file);
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    // Step 5: Send loan details to client
+    struct LoanApprovalRequest loan_request_info;
+    strncpy(loan_request_info.username, loan_app.username, sizeof(loan_request_info.username) - 1);
+    loan_request_info.username[sizeof(loan_request_info.username) - 1] = '\0';
+    loan_request_info.amount = loan_app.amount;
+    if (send(client_sockfd, &loan_request_info, sizeof(loan_request_info), 0) == -1) {
+        perror("send error");
+        fclose(loan_file);
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+    
+    // Step 6: Receive the response from the client
+    char response[20];
+    if (recv(client_sockfd, response, sizeof(response), 0) <= 0) {
+        perror("recv error");
+        fclose(loan_file);
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    // Step 7: Process response
+    if (strcmp(response, "reject") == 0) {
+        // Delete the loan application record (optional)
+    } else if (strcmp(response, "approve") == 0) {
+        // Step 8: Update the customer's balance directly in customers.txt
+        FILE *customer_file = fopen("customers.txt", "rb+");
+        if (!customer_file) {
+            perror("File open error");
+            fclose(loan_file);
+            close(client_sockfd);
+            pthread_exit(NULL);
+        }
+
+        struct Customer customer;
+        int customer_found = 0;
+
+        // Lock the mutex to ensure exclusive access to the customer file
+        pthread_mutex_lock(&customer_file_mutex);
+
+        // Find the customer and update balance
+        while (fread(&customer, sizeof(struct Customer), 1, customer_file) == 1) {
+            if (strcmp(customer.username, customer_username) == 0) {
+                customer_found = 1;
+                customer.balance += loan_app.amount; // Deposit the loan amount
+                fseek(customer_file, -sizeof(struct Customer), SEEK_CUR);
+                fwrite(&customer, sizeof(struct Customer), 1, customer_file);
+                fflush(customer_file); // Ensure the data is written to the file
+                break;
+            }
+        }
+
+        if (!customer_found) {
+            printf("Customer %s not found.\n", customer_username);
+        }
+
+        fclose(customer_file);
+
+        // Step 9: Update passbook for the customer
+        FILE *transaction_file = fopen("transactions.txt", "r+b");
+        if (transaction_file == NULL) {
+            perror("File open error for transactions.txt");
+            fclose(loan_file);
+            pthread_exit(NULL);
+        }
+
+        struct Passbook passbook;
+        int passbook_found = 0;
+
+        // Lock the mutex to ensure exclusive access to the passbook file
+        pthread_mutex_lock(&customer_file_mutex);
+
+        // Search for the passbook of the customer
+        while (fread(&passbook, sizeof(struct Passbook), 1, transaction_file) == 1) {
+            if (strcmp(passbook.username, customer_username) == 0) {
+                passbook_found = 1;
+
+                // Create the loan deposit transaction
+                struct Transaction loan_transaction;
+                strcpy(loan_transaction.type, "Loan Deposit");
+                loan_transaction.amount = loan_app.amount;
+
+                // Get the current date
+                time_t now = time(NULL);
+                strftime(loan_transaction.date, sizeof(loan_transaction.date), "%Y-%m-%d", localtime(&now));
+                strcpy(loan_transaction.from_username, "cashFlow"); // Source of loan
+                strcpy(loan_transaction.to_username, customer_username); // Destination is the customer
+
+                // Add the loan transaction to the passbook
+                if (passbook.num_transactions < 100) {
+                    passbook.transactions[passbook.num_transactions++] = loan_transaction;
+
+                    // Seek back and update the passbook record
+                    fseek(transaction_file, -sizeof(struct Passbook), SEEK_CUR);
+                    fwrite(&passbook, sizeof(struct Passbook), 1, transaction_file);
+                    fflush(transaction_file); // Ensure the data is written to the file
+                } else {
+                    printf("Passbook for customer %s is full.\n", customer_username);
+                }
+                break;
+            }
+        }
+
+        if (!passbook_found) {
+            printf("Passbook for customer %s not found.\n", customer_username);
+        }
+
+        fclose(transaction_file);
+        pthread_mutex_unlock(&customer_file_mutex); // Unlock the mutex after updating passbook
+    }
+
+    // Step 10: Update Employee structure
+    FILE *employee_file = fopen("employees.txt", "rb+");
+    if (!employee_file) {
+        perror("File open error for employees.txt");
+        fclose(loan_file);
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    struct Employee employee;
+    int employee_found = 0;
+
+    // Lock the mutex to ensure exclusive access to the employee file
+    pthread_mutex_lock(&customer_file_mutex);
+
+    // Find the employee and update processing_usernames
+    while (fread(&employee, sizeof(struct Employee), 1, employee_file) == 1) {
+        if (strcmp(employee.username, employee_username) == 0) {
+            employee_found = 1;
+
+            // Remove the customer username from processing_usernames
+            for (int i = 0; i < 5; i++) {
+                if (strcmp(employee.processing_usernames[i], customer_username) == 0) {
+                    // Shift the remaining usernames
+                    for (int j = i; j < 4; j++) {
+                        strcpy(employee.processing_usernames[j], employee.processing_usernames[j + 1]);
+                    }
+                    // Clear the last username
+                    memset(employee.processing_usernames[4], 0, sizeof(employee.processing_usernames[4]));
+                    break;
+                }
+            }
+
+            // Seek back and update the employee record
+            fseek(employee_file, -sizeof(struct Employee), SEEK_CUR);
+            fwrite(&employee, sizeof(struct Employee), 1, employee_file);
+            fflush(employee_file); // Ensure the data is written to the file
+            break;
+        }
+    }
+
+    if (!employee_found) {
+        printf("Employee %s not found.\n", employee_username);
+    }
+
+    fclose(employee_file);
+    pthread_mutex_unlock(&customer_file_mutex); // Unlock the mutex after updating employee data
+
+    // Step 11: Delete the loan application record
+    FILE *temp_file = fopen("temp_loanApplications.txt", "wb");
+    if (!temp_file) {
+        perror("File open error");
+        fclose(loan_file);
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    // Reset the file pointer to the beginning
+    rewind(loan_file);
+
+    // Write loans except the one that was approved
+    while (fread(&loan_app, sizeof(struct LoanApplication), 1, loan_file) == 1) {
+        if (strcmp(loan_app.username, customer_username) != 0) {
+            fwrite(&loan_app, sizeof(struct LoanApplication), 1, temp_file);
+        }
+    }
+
+    fclose(loan_file);
+    fclose(temp_file);
+    remove("loanApplications.txt");
+    rename("temp_loanApplications.txt", "loanApplications.txt");
+
+    // Close the socket
+    close(client_sockfd);
+    pthread_exit(NULL);
+}
+
+
+
+
 void *handle_client(void *arg) {
     int client_sockfd = *(int *)arg;
     free(arg);
@@ -1394,18 +1737,27 @@ void *handle_client(void *arg) {
 
         case 'g':
             if (strcmp(operation.operation, "getbalance") == 0) {
-                struct BalanceRequest *balance_request = malloc(sizeof(struct BalanceRequest));
-                if (balance_request == NULL) {
-                    perror("malloc");
-                    close(client_sockfd);
-                    pthread_exit(NULL);
-                }
+            struct BalanceRequest *balance_request = malloc(sizeof(struct BalanceRequest));
+            if (balance_request == NULL) {
+                perror("malloc");
+                close(client_sockfd);
+                pthread_exit(NULL);
+            }
 
-                memcpy(&balance_request->customer, &operation.data.customer, sizeof(struct Customer));
-                balance_request->client_sockfd = client_sockfd;
+            memcpy(&balance_request->customer, &operation.data.customer, sizeof(struct Customer));
+            balance_request->client_sockfd = client_sockfd;
 
-                pthread_create(&thread_id, NULL, getbalance, balance_request);
-            } if (strcmp(operation.operation, "getEmployeeLoans") == 0) {
+            printf("client_sockfd: %d\n", client_sockfd);
+
+            // Create the thread and check for success
+            if (pthread_create(&thread_id, NULL, getbalance, balance_request) != 0) {
+                perror("pthread_create");
+                free(balance_request);  // Free allocated memory on failure
+                close(client_sockfd);
+                pthread_exit(NULL);
+            }
+        }
+else if (strcmp(operation.operation, "getEmployeeLoans") == 0) {
                 // Create a structure to hold employee data and socket information
                 struct EmployeeLoanRequest *loan_request = malloc(sizeof(struct EmployeeLoanRequest));
                 if (loan_request == NULL) {
@@ -1435,16 +1787,29 @@ void *handle_client(void *arg) {
                     close(client_sockfd);
                     pthread_exit(NULL);
                 }
-
                 memcpy(&loan_request->username, &operation.data.customer.username, sizeof(struct Customer));
                 loan_request->client_sockfd = client_sockfd;
-
                 pthread_create(&thread_id, NULL, handle_loan_application, loan_request);
-            } else {
-                close(client_sockfd);
-                pthread_exit(NULL);
-            }
-            break;
+            } else if (strcmp(operation.operation, "loanApproval") == 0) {
+                    struct LoanRequest *loan_approval_request = malloc(sizeof(struct LoanRequest));
+                    if (loan_approval_request == NULL) {
+                        perror("malloc");
+                        close(client_sockfd);
+                        pthread_exit(NULL);
+                    }
+
+                    // Copy the loan approval details from the operation data
+                    memcpy(&loan_approval_request->username, &operation.data.customer.username, sizeof(loan_approval_request->username));
+                    loan_approval_request->client_sockfd = client_sockfd; // Pass the socket descriptor
+
+                    // Create a thread to handle loan approval
+                    pthread_create(&thread_id, NULL, handle_loan_approval, loan_approval_request);
+                    pthread_detach(thread_id); // Detach the thread to handle it independently
+                } else {
+                    close(client_sockfd);
+                    pthread_exit(NULL);
+                }
+                break;
     
     // Add this case inside the handle_client() switch statement
         case 'd': // New case for deposit operation
