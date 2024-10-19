@@ -364,6 +364,162 @@ void *handle_loan_application(void *arg) {
     pthread_exit(NULL);
 }
 
+void *update_username(void *arg) {
+    struct PassbookRequest *request = (struct PassbookRequest *)arg;
+    int client_sockfd = request->client_sockfd;
+    char *current_username = request->username;
+
+    // Lock the mutex before accessing the file
+    pthread_mutex_lock(&customer_file_mutex);
+
+    FILE *customer_file = fopen("customers.txt", "rb+");
+    if (customer_file == NULL) {
+        perror("fopen customers.txt");
+        pthread_mutex_unlock(&customer_file_mutex);  // Unlock before exiting
+        pthread_exit(NULL);
+    }
+
+    struct Customer customer;
+    int user_found = 0;
+
+    // Check if the current username exists in customers.txt
+    while (fread(&customer, sizeof(struct Customer), 1, customer_file) == 1) {
+        if (strcmp(customer.username, current_username) == 0) {
+            user_found = 1;
+            break;
+        }
+    }
+
+    // If user not found, unlock and exit
+    if (!user_found) {
+        fclose(customer_file);
+        pthread_mutex_unlock(&customer_file_mutex);
+        pthread_exit(NULL);
+    }
+
+    // Send the message "newname" to the client, asking for the new username
+    char message[] = "newname";
+    printf("%s\n", message);   
+    ssize_t num_bytes_sent = send(client_sockfd, message, sizeof(message), 0);
+    if (num_bytes_sent == -1) {
+        perror("send newname request");
+        fclose(customer_file);
+        pthread_mutex_unlock(&customer_file_mutex);
+        pthread_exit(NULL);
+    }
+
+    // Receive the new username from the client
+    char new_username[20];
+    ssize_t num_bytes_received = recv(client_sockfd, new_username, sizeof(new_username), 0);
+    if (num_bytes_received == -1) {
+        perror("recv new_username");
+        fclose(customer_file);
+        pthread_mutex_unlock(&customer_file_mutex);
+        pthread_exit(NULL);
+    }
+    new_username[num_bytes_received] = '\0';  // Null-terminate the new username
+
+    // Check if the new username is already taken
+    rewind(customer_file);  // Reset file pointer to the beginning
+    while (fread(&customer, sizeof(struct Customer), 1, customer_file) == 1) {
+        if (strcmp(customer.username, new_username) == 0) {
+            // Send an error response to the client: new name already exists
+            int response = -1;
+            send(client_sockfd, &response, sizeof(response), 0);
+            fclose(customer_file);
+            pthread_mutex_unlock(&customer_file_mutex);
+            pthread_exit(NULL);
+        }
+    }
+
+    // New username is available, update the passbook and customer files
+
+    // Rewind the file again to update the current user's name
+    rewind(customer_file);
+    while (fread(&customer, sizeof(struct Customer), 1, customer_file) == 1) {
+        if (strcmp(customer.username, current_username) == 0) {
+            // Update the username in customers.txt
+            fseek(customer_file, -sizeof(struct Customer), SEEK_CUR);  // Move the file pointer to the current record
+            strncpy(customer.username, new_username, sizeof(customer.username) - 1);
+            customer.username[sizeof(customer.username) - 1] = '\0';  // Null-terminate
+            fwrite(&customer, sizeof(struct Customer), 1, customer_file);
+            fflush(customer_file);  // Ensure changes are written to the file
+            break;
+        }
+    }
+
+    fclose(customer_file);
+
+    // Open transactions.txt to update the passbook and transactions
+    FILE *transaction_file = fopen("transactions.txt", "rb+");
+    if (transaction_file == NULL) {
+        perror("fopen transactions.txt");
+        pthread_mutex_unlock(&customer_file_mutex);
+        pthread_exit(NULL);
+    }
+
+    struct Passbook passbook;
+    // Iterate through the passbooks to update the username and target transactions
+    while (fread(&passbook, sizeof(struct Passbook), 1, transaction_file) == 1) {
+        if (strcmp(passbook.username, current_username) == 0) {
+            // Update the username in the passbook
+            fseek(transaction_file, -sizeof(struct Passbook), SEEK_CUR);
+            strncpy(passbook.username, new_username, sizeof(passbook.username) - 1);
+            passbook.username[sizeof(passbook.username) - 1] = '\0';
+            fwrite(&passbook, sizeof(struct Passbook), 1, transaction_file);
+            fflush(transaction_file);
+        }
+
+        // Update all transactions with target 'current_username' to 'new_username'
+        for (int i = 0; i < passbook.num_transactions; i++) {
+            if (strcmp(passbook.transactions[i].from_username, current_username) == 0) {
+                strncpy(passbook.transactions[i].from_username, new_username, sizeof(passbook.transactions[i].from_username) - 1);
+                passbook.transactions[i].from_username[sizeof(passbook.transactions[i].from_username) - 1] = '\0';
+            }
+            if (strcmp(passbook.transactions[i].to_username, current_username) == 0) {
+                strncpy(passbook.transactions[i].to_username, new_username, sizeof(passbook.transactions[i].to_username) - 1);
+                passbook.transactions[i].to_username[sizeof(passbook.transactions[i].to_username) - 1] = '\0';
+            }
+        }
+    }
+
+    fclose(transaction_file);
+
+    // Unlock the mutex after completing the file operations
+    pthread_mutex_unlock(&customer_file_mutex);
+
+        // Open loanApplications.txt to update the username in loan applications
+    FILE *loan_file = fopen("loanApplications.txt", "rb+");
+    if (loan_file == NULL) {
+        perror("fopen loanApplications.txt");
+        pthread_mutex_unlock(&customer_file_mutex);
+        pthread_exit(NULL);
+    }
+
+    struct LoanApplication loan_app;
+    // Iterate through the loan applications to update the username
+    while (fread(&loan_app, sizeof(struct LoanApplication), 1, loan_file) == 1) {
+        if (strcmp(loan_app.username, current_username) == 0) {
+            // Update the username in loanApplications.txt
+            fseek(loan_file, -sizeof(struct LoanApplication), SEEK_CUR);  // Move the file pointer to the current record
+            strncpy(loan_app.username, new_username, sizeof(loan_app.username) - 1);
+            loan_app.username[sizeof(loan_app.username) - 1] = '\0';  // Null-terminate
+            fwrite(&loan_app, sizeof(struct LoanApplication), 1, loan_file);
+            fflush(loan_file);  // Ensure changes are written to the file
+        }
+    }
+
+    fclose(loan_file);
+
+
+    // Send a success message to the client
+    int success = 1;
+    send(client_sockfd, &success, sizeof(success), 0);
+
+    pthread_exit(NULL);
+}
+
+
 void *handle_deposit_application(void *arg) {
     struct DepositRequest *request = (struct DepositRequest *)arg;
     int client_sockfd = request->client_sockfd;
@@ -941,6 +1097,29 @@ void *handle_client(void *arg) {
     }
 
     break;
+
+    case 'u': // New case for update username operation
+        if (strcmp(operation.operation, "updateUsername") == 0) {
+            struct PassbookRequest *passbook_request = malloc(sizeof(struct PassbookRequest));
+            if (passbook_request == NULL) {
+                perror("malloc");
+                close(client_sockfd);
+                pthread_exit(NULL);
+            }
+
+            // Copy the username and socket descriptor to the passbook request structure
+            strncpy(passbook_request->username, operation.data.customer.username, sizeof(passbook_request->username) - 1);
+            passbook_request->username[sizeof(passbook_request->username) - 1] = '\0'; // Null-terminate
+            passbook_request->client_sockfd = client_sockfd;
+
+            // Create a new thread to handle the username update
+            pthread_create(&thread_id, NULL, update_username, passbook_request);
+        } else {
+            close(client_sockfd);
+            pthread_exit(NULL);
+        }
+    break;
+
 
 
 

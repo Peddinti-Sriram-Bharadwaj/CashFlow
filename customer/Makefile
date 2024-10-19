@@ -34,5 +34,8 @@ withdrawMoney.out: withdrawMoney.c
 viewHistory.out: viewHistory.c
 	gcc viewHistory.c -o viewHistory.out
 
+updateUsername.out: updateUsername.c
+	gcc updateUsername.c -o updateUsername.out
+
 clean:
 	rm -f *.out

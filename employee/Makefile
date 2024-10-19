@@ -1,4 +1,4 @@
-all: login.out employee.out addcustomer.out logout.out viewHistory.out
+all: login.out employee.out addcustomer.out logout.out viewHistory.out  updateUsername.out
 
 
 login.out: login.c
@@ -14,4 +14,7 @@ logout.out: logout.c
 
 viewHistory.out: viewHistory.c
 	gcc -o viewHistory.out viewHistory.c 
+
+updateUsername.out: updateUsername.c
+	gcc -o updateUsername.out updateUsername.c -I/opt/homebrew/Cellar/libsodium/1.0.20/include -L/opt/homebrew/Cellar/libsodium/1.0.20/lib -lsodium
 

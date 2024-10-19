@@ -17,6 +17,9 @@ int main(int argc, char* argv[]){
   
   char viewHistoryPath[256];
     snprintf(viewHistoryPath, sizeof(viewHistoryPath), "%s%s", basePath, "/employee/viewHistory.out");
+  
+  char updateUsernamePath[256];
+    snprintf(updateUsernamePath, sizeof(updateUsernamePath), "%s%s", basePath, "/employee/updateUsername.out");
 
   printf("Welcome to the workspace dear employee\n");
   printf("Hello %s\n", username);
@@ -42,6 +45,7 @@ int main(int argc, char* argv[]){
       break;
     case 2:
       printf("Modify customer details\n");
+      execvp(updateUsernamePath, argv);
       break;
 case 3:
       printf("Process loan application\n");
