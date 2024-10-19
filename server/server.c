@@ -30,9 +30,13 @@ struct Admin {
     char username[20];
 };
 
+#define MAX_EMPLOYEES 5
+
 struct Employee {
-    char username[20];
+    char username[20];                   // Field for the employee's username
+    char processing_usernames[5][20]; // Array to hold 5 usernames of customers whose loans are being processed
 };
+
 
 struct Manager {
     char username[20];
@@ -210,6 +214,12 @@ void *addadmin(void *arg) {
 // Function to handle adding an employee
 void *addemployee(void *arg) {
     struct Employee *employee = (struct Employee *)arg;
+
+    // Initialize processing usernames to "None"
+    for (int i = 0; i < MAX_EMPLOYEES; i++) {
+        strncpy(employee->processing_usernames[i], "None", sizeof(employee->processing_usernames[i]) - 1);
+        employee->processing_usernames[i][sizeof(employee->processing_usernames[i]) - 1] = '\0'; // Null-terminate
+    }
 
     // Lock the mutex before accessing the file
     pthread_mutex_lock(&employee_file_mutex);
@@ -993,7 +1003,74 @@ void *handle_feedback_request(void *arg) {
     pthread_exit(NULL);
 }
 
+void *handle_list_pending_loan_applications(void *arg) {
+    struct LoanRequest *request = (struct LoanRequest *)arg;
+    int client_sockfd = request->client_sockfd;
 
+    // Step 1: Open the loanApplications.txt file for reading
+    FILE *file = fopen("loanApplications.txt", "rb");
+    if (file == NULL) {
+        perror("fopen");
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    struct LoanApplication loan_application;
+    int pending_count = 0;
+
+    // Step 2: Count the number of pending applications
+    while (fread(&loan_application, sizeof(struct LoanApplication), 1, file) == 1) {
+        if (strcmp(loan_application.assigned_employee, "None") == 0) {
+            pending_count++;
+        }
+    }
+
+    // Step 3: Send the number of pending applications to the client
+    ssize_t num_bytes_sent = send(client_sockfd, &pending_count, sizeof(pending_count), 0);
+    if (num_bytes_sent == -1) {
+        perror("send");
+        fclose(file);
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    // Step 4: Reset the file pointer to the beginning of the file
+    rewind(file);
+
+    // Step 5: Send each pending application to the client
+    while (fread(&loan_application, sizeof(struct LoanApplication), 1, file) == 1) {
+        if (strcmp(loan_application.assigned_employee, "None") == 0) {
+            // Send the application to the client
+            num_bytes_sent = send(client_sockfd, &loan_application, sizeof(struct LoanApplication), 0);
+            if (num_bytes_sent == -1) {
+                perror("send");
+                fclose(file);
+                close(client_sockfd);
+                pthread_exit(NULL);
+            }
+
+            // Step 6: Wait for acknowledgment from the client
+            int ack;
+            ssize_t num_bytes_received = recv(client_sockfd, &ack, sizeof(ack), 0);
+            if (num_bytes_received == -1) {
+                perror("recv");
+                fclose(file);
+                close(client_sockfd);
+                pthread_exit(NULL);
+            }
+
+            // Optionally handle the acknowledgment
+            if (ack != 1) {
+                printf("Client did not acknowledge application for user %s\n", loan_application.username);
+            }
+        }
+    }
+
+    // Step 7: Close the file and clean up
+    fclose(file);
+    close(client_sockfd);
+    pthread_exit(NULL);
+}
 
 
 void *handle_client(void *arg) {
@@ -1189,6 +1266,7 @@ void *handle_client(void *arg) {
         if (strcmp(operation.operation, "updateUsername") == 0) {
             struct PassbookRequest *passbook_request = malloc(sizeof(struct PassbookRequest));
             if (passbook_request == NULL) {
+
                 perror("malloc");
                 close(client_sockfd);
                 pthread_exit(NULL);
@@ -1228,7 +1306,22 @@ case 'f': // New case for feedback submission
     }
     break;
 
-// The rest of your server code continues here...
+    case 'p': // New case for listing pending applications
+    if (strcmp(operation.operation, "pending") == 0) {
+        struct LoanRequest *loan_request = malloc(sizeof(struct LoanRequest));
+        if (loan_request == NULL) {
+            perror("malloc");
+            close(client_sockfd);
+            pthread_exit(NULL);
+        }
+
+
+        memcpy(&loan_request->username, &operation.data.customer.username, sizeof(struct Customer));
+        loan_request->client_sockfd = client_sockfd;
+
+        pthread_create(&thread_id, NULL, handle_list_pending_loan_applications, loan_request);
+    } 
+    break; // End of pending applications case
 
 
 
