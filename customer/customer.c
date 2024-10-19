@@ -33,6 +33,9 @@ int main(int argc, char *argv[]) {
     char withdrawMoneyPath[256];
     snprintf(withdrawMoneyPath, sizeof(withdrawMoneyPath), "%s%s", basePath, "/customer/withdrawMoney.out");
 
+    char viewHistoryPath[256];
+    snprintf(viewHistoryPath, sizeof(viewHistoryPath), "%s%s", basePath, "/customer/viewHistory.out");
+
 
     printf("welcome to Cashflow dear user\n");
     printf("Hello %s\n", username);
@@ -80,6 +83,7 @@ int main(int argc, char *argv[]) {
             break;
         case 8:
             printf("View Transaction History\n");
+            execvp(viewHistoryPath, argv);
             break;
         case 9:
             printf("Logout\n");

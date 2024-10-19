@@ -18,10 +18,11 @@ struct Operation {
 };
 
 int main(int argc, char *argv[]) {
+
+    char *username = argv[0]; // Use argv[1] as the username
     char CustomerActionsPath[256];
     snprintf(CustomerActionsPath, sizeof(CustomerActionsPath), "%s%s", basePath, "/customer/customer.out");
 
-    char *username = argv[0]; // Use argv[0] as the username
     printf("This is the username: %s\n", username);
     fflush(stdout); // Ensure output is printed immediately
 
@@ -111,8 +112,10 @@ int main(int argc, char *argv[]) {
     close(sockfd);
 
     // Execute the next customer action
-    execvp(CustomerActionsPath, argv);
-    perror("execvp failed");
+    if (execvp(CustomerActionsPath, argv) == -1) {
+        perror("execvp failed");
+        exit(1);
+    }
 
-    return 0; // Exit successfully
+    return 0; // This line will not be reached if execvp is successful
 }
