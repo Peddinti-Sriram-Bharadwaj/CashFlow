@@ -4,7 +4,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <string.h>
-#include <sodium.h> // Include libsodium header
 #include "../global.c"
 
 int main(int argc, char* argv[]){
@@ -15,6 +14,9 @@ int main(int argc, char* argv[]){
     snprintf(LogOutPath, sizeof(LogOutPath), "%s%s", basePath, "/employee/logout.out");
   char AddCustomerPath[256];
     snprintf(AddCustomerPath, sizeof(AddCustomerPath), "%s%s", basePath, "/employee/addcustomer.out");
+  
+  char viewHistoryPath[256];
+    snprintf(viewHistoryPath, sizeof(viewHistoryPath), "%s%s", basePath, "/employee/viewHistory.out");
 
   printf("Welcome to the workspace dear employee\n");
   printf("Hello %s\n", username);
@@ -51,6 +53,7 @@ case 3:
       break;
     case 6:
       printf("View customer Transactions\n");
+      execvp(viewHistoryPath, argv);
       break;
     case 7:
       printf("Change password\n");
