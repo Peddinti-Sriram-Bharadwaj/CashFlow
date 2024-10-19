@@ -438,7 +438,6 @@ void *handle_deposit_application(void *arg) {
 
                     // Add the deposit transaction to the passbook
                     passbook.transactions[passbook.num_transactions++] = deposit_transaction;
-                    printf("%d\n", passbook.num_transactions);
 
                     // Seek back and update the passbook record
                     fseek(transaction_file, -sizeof(struct Passbook), SEEK_CUR);
@@ -583,7 +582,6 @@ void *handle_transfer_money(void *arg) {
 }
 
 
-// Function to handle withdrawal application
 void *handle_withdrawal_application(void *arg) {
     struct WithdrawalRequest *request = (struct WithdrawalRequest *)arg;
     int client_sockfd = request->client_sockfd;
@@ -593,8 +591,8 @@ void *handle_withdrawal_application(void *arg) {
     ssize_t num_bytes_sent = send(client_sockfd, send_message, sizeof(send_message), 0);
     if (num_bytes_sent == -1) {
         perror("send");
-        close(client_sockfd); // Close the socket here, after the error is logged
-        pthread_exit(NULL);    // Exit the thread
+        close(client_sockfd);
+        pthread_exit(NULL);
     }
 
     // Step 2: Receive the withdrawal amount from the client
@@ -624,6 +622,7 @@ void *handle_withdrawal_application(void *arg) {
     while (fread(&temp_customer, sizeof(struct Customer), 1, file) == 1) {
         if (strcmp(temp_customer.username, request->username) == 0) {
             found = 1;
+
             // Check if sufficient balance is available
             if (temp_customer.balance >= withdrawal_amount) {
                 temp_customer.balance -= withdrawal_amount; // Deduct the withdrawal amount
@@ -632,25 +631,51 @@ void *handle_withdrawal_application(void *arg) {
                 fseek(file, -sizeof(struct Customer), SEEK_CUR);
                 fwrite(&temp_customer, sizeof(struct Customer), 1, file);
 
-                // Send success response to the client
-                int response = 1; // Success
-                num_bytes_sent = send(client_sockfd, &response, sizeof(response), 0);
-                if (num_bytes_sent == -1) {
-                    perror("send (after update)");
+                // Now, update the customer's passbook with the withdrawal transaction
+                FILE *transaction_file = fopen("transactions.txt", "r+b");
+                if (transaction_file == NULL) {
+                    perror("fopen transactions.txt");
                     fclose(file);
+                    pthread_mutex_unlock(&customer_file_mutex);  // Unlock before exiting
                     close(client_sockfd);
                     pthread_exit(NULL);
                 }
+
+                struct Passbook passbook;
+                int passbook_found = 0;
+
+                // Search for the passbook of the customer
+                while (fread(&passbook, sizeof(struct Passbook), 1, transaction_file) == 1) {
+                    if (strcmp(passbook.username, request->username) == 0) {
+                        passbook_found = 1;
+
+                        // Create the withdrawal transaction
+                        struct Transaction withdrawal_transaction;
+                        strcpy(withdrawal_transaction.type, "Withdrawal");
+                        withdrawal_transaction.amount = withdrawal_amount;
+                        strcpy(withdrawal_transaction.date, "2024-10-19"); // You can set the actual date here
+                        strcpy(withdrawal_transaction.from_username, request->username);
+                        strcpy(withdrawal_transaction.to_username, request->username);
+
+                        // Add the withdrawal transaction to the passbook
+                        passbook.transactions[passbook.num_transactions++] = withdrawal_transaction;
+
+                        // Seek back and update the passbook record
+                        fseek(transaction_file, -sizeof(struct Passbook), SEEK_CUR);
+                        fwrite(&passbook, sizeof(struct Passbook), 1, transaction_file);
+                        break;
+                    }
+                }
+
+                fclose(transaction_file);
+
+                // Send success response to the client
+                int response = 1; // Success
+                send(client_sockfd, &response, sizeof(response), 0);
             } else {
                 // Not enough funds
                 int response = -1; // Failure
-                num_bytes_sent = send(client_sockfd, &response, sizeof(response), 0);
-                if (num_bytes_sent == -1) {
-                    perror("send (insufficient funds)");
-                    fclose(file);
-                    close(client_sockfd);
-                    pthread_exit(NULL);
-                }
+                send(client_sockfd, &response, sizeof(response), 0);
             }
             break;
         }
@@ -664,18 +689,14 @@ void *handle_withdrawal_application(void *arg) {
     // If customer not found, send failure response
     if (!found) {
         int response = -1; // Failure
-        num_bytes_sent = send(client_sockfd, &response, sizeof(response), 0);
-        if (num_bytes_sent == -1) {
-            perror("send (customer not found)");
-            close(client_sockfd);
-            pthread_exit(NULL);
-        }
+        send(client_sockfd, &response, sizeof(response), 0);
     }
 
     // Step 4: Clean up and exit the thread
-    close(client_sockfd);  // Close the socket after all operations are done
+    close(client_sockfd);
     pthread_exit(NULL);
 }
+
 
 
 void *getpassbook(void *arg) {
@@ -701,7 +722,6 @@ void *getpassbook(void *arg) {
         // Check if the username matches
         if (strcmp(passbook.username, username) == 0) {
             found = 1;
-            printf("%d\n", passbook.num_transactions);
 
             // Send the passbook structure to the client
             ssize_t num_bytes_sent = send(client_sockfd, &passbook, sizeof(passbook), 0);
@@ -716,11 +736,9 @@ void *getpassbook(void *arg) {
 
     // Unlock the mutex after the file operation is complete
     pthread_mutex_unlock(&customer_file_mutex);
-    printf("%d\n", found);
 
     // If passbook not found, send an error message
     if (!found) {
-        printf("Passbook for user %s not found.\n", username);
         // Optionally send an error response to the client
         int response = -1;
         ssize_t num_bytes_sent = send(client_sockfd, &response, sizeof(response), 0);
@@ -881,7 +899,7 @@ void *handle_client(void *arg) {
             }
             break;
         
-        case 'w': // New case for withdrawal operation
+       case 'w': // New case for withdrawal operation
     if (strcmp(operation.operation, "withdrawMoney") == 0) {
         struct WithdrawalRequest *withdrawal_request = malloc(sizeof(struct WithdrawalRequest));
         if (withdrawal_request == NULL) {
@@ -889,18 +907,17 @@ void *handle_client(void *arg) {
             close(client_sockfd);
             pthread_exit(NULL);
         }
-
         // Copy the username and socket descriptor to the withdrawal request structure
         strncpy(withdrawal_request->username, operation.data.customer.username, sizeof(withdrawal_request->username) - 1);
         withdrawal_request->username[sizeof(withdrawal_request->username) - 1] = '\0'; // Null-terminate
         withdrawal_request->client_sockfd = client_sockfd;
-
         // Create a new thread to handle the withdrawal
         pthread_create(&thread_id, NULL, handle_withdrawal_application, withdrawal_request);
     } else {
         close(client_sockfd);
         pthread_exit(NULL);
     }
+    break;
 
     case 'v': // New case for getting passbook
     if (strcmp(operation.operation, "viewHistory") == 0) {
