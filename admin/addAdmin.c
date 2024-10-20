@@ -6,11 +6,9 @@
 #include <string.h>
 #include <sodium.h> // Include libsodium header
 #include "../global.c"
-
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <stdlib.h>
-#include <errno.h>
 
 #define SOCKET_PATH "/tmp/server"
 #define BUFFER_SIZE 256
@@ -33,145 +31,164 @@ void remove_newline(char *str) {
     }
 }
 
-void lock_file(int fd, int lock_type) {
-    struct flock fl;
-    fl.l_type = lock_type; // Set the lock type (read or write)
-    fl.l_whence = SEEK_SET;
-    fl.l_start = 0; // Lock the whole file
-    fl.l_len = 0; // Lock all
+int username_exists(int fd, const char *username) {
+    struct AdminLogin temp;
+    int found = 0;
 
-    // Attempt to acquire the lock; if blocked, wait
-    if (fcntl(fd, F_SETLKW, &fl) == -1) {
-        perror("Failed to lock the file");
-        exit(1);
-    }
-}
-
-void unlock_file(int fd) {
-    struct flock fl;
-    fl.l_type = F_UNLCK; // Unlock
-    fl.l_whence = SEEK_SET;
-    fl.l_start = 0; // Unlock the whole file
-    fl.l_len = 0; // Unlock all
-
-    if (fcntl(fd, F_SETLK, &fl) == -1) {
-        perror("Failed to unlock the file");
-        exit(1);
-    }
-}
-
-int username_exists(const char *username, const char *file_path) {
-    struct AdminLogin a;
-    int fd = open(file_path, O_RDONLY);
-    if (fd == -1) {
-        perror("Failed to open the file");
-        return 0; // Assume username does not exist
-    }
-
-    // Lock the file for reading
-    lock_file(fd, F_RDLCK); // Acquire a read lock
-
-    // Check if the username exists
-    while (read(fd, &a, sizeof(a)) > 0) {
-        if (strcmp(a.username, username) == 0) {
-            unlock_file(fd); // Unlock before returning
-            close(fd);
-            return 1; // Username exists
+    // Read existing usernames from the file
+    while (read(fd, &temp, sizeof(temp)) > 0) {
+        if (strcmp(temp.username, username) == 0) {
+            found = 1; // Username exists
+            break;
         }
     }
 
-    unlock_file(fd); // Unlock after checking
-    close(fd);
-    return 0; // Username does not exist
+    return found; // Return whether the username exists
 }
 
-int main() {
+void add_admin(int fd, struct AdminLogin *e) {
+    // Write the admin data to the file
+    ssize_t bytes_written = write(fd, e, sizeof(*e));
+    if (bytes_written != sizeof(*e)) {
+        perror("Failed to write admin data");
+    } else {
+        printf("************************************\n");
+        printf("* Admin added successfully      *\n");
+        printf("************************************\n");
+    }
+}
+
+int main(int argc, char *argv[]) {
+    char AdminLoginsPath[256];
+    snprintf(AdminLoginsPath, sizeof(AdminLoginsPath), "%s%s", basePath, "/admin/adminlogins.txt");
+
+    char AdminActionsPath[256];
+    snprintf(AdminActionsPath, sizeof(AdminActionsPath), "%s%s", basePath, "/admin/admin.out");
+
+    char ExitPath[256];
+    snprintf(ExitPath, sizeof(ExitPath), "%s%s", basePath, "/welcome.out");
+
     // Initialize libsodium
     if (sodium_init() < 0) {
-        const char *msg = "libsodium initialization failed\n";
-        write(STDOUT_FILENO, msg, strlen(msg));
+        printf("************************************\n");
+        printf("* libsodium initialization failed  *\n");
+        printf("************************************\n");
+        execvp(ExitPath, argv); // Go to ExitPath on error
+        perror("execvp failed");
         return 1;
     }
 
-    const char *prompt1 = "Please enter the name of the customer to be added\nEnter the username\n";
-    write(STDOUT_FILENO, prompt1, strlen(prompt1));
-    char username[20], password[20];
-    read(STDIN_FILENO, username, sizeof(username));
-    remove_newline(username);
-
-    // Prepare the admin login file path
-    char AdminLoginsPath[256];
-    sprintf(AdminLoginsPath, "%s%s", basePath, "/admin/adminlogins.txt");
-
-    // Check if the username already exists in the admin logins
-    if (username_exists(username, AdminLoginsPath)) {
-        const char *msg = "Username already exists! Please try a different username.\n";
-        write(STDOUT_FILENO, msg, strlen(msg));
-        return 1; // Return or execvp to the admin actions path
-    }
-
-    const char *prompt2 = "Ask the customer to create a password\n";
-    write(STDOUT_FILENO, prompt2, strlen(prompt2));
-    read(STDIN_FILENO, password, sizeof(password));
-    remove_newline(password);
-
-    // Hash the password
-    struct AdminLogin a;
-    if (crypto_pwhash_str(a.hashed_password, password, strlen(password), 
-                           crypto_pwhash_OPSLIMIT_INTERACTIVE, 
-                           crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
-        const char *msg = "Password hashing failed\n";
-        write(STDOUT_FILENO, msg, strlen(msg));
-        return 1;
-    }
-
-    // Store the username and hashed password in the struct
-    strncpy(a.username, username, sizeof(a.username) - 1); // Ensure null-termination
-    strncpy(a.loggedin, "n", sizeof(a.loggedin) - 1);
-
-    // Prepare the operation structure
-    struct Operation op;
-    strncpy(op.operation, "addadmin", sizeof(op.operation) - 1);
-    op.admin = a;
-
-    // Open the file for writing
+    // Open the file for reading and writing with a lock
     int fd = open(AdminLoginsPath, O_RDWR | O_APPEND | O_CREAT, 0644);
     if (fd == -1) {
-        const char *msg = "Failed to open the file\n";
-        write(STDOUT_FILENO, msg, strlen(msg));
+        perror("Failed to open the file for reading and writing");
+        execvp(ExitPath, argv); // Go to ExitPath on error
         return 1;
     }
 
-    // Lock the file for writing
-    lock_file(fd, F_WRLCK); // Acquire a write lock
+    struct flock lock;
+    lock.l_type = F_WRLCK;    // Exclusive lock
+    lock.l_whence = SEEK_SET;
+    lock.l_start = 0;
+    lock.l_len = 0;           // Lock the whole file
 
-    // Write the struct with username and hashed password to the file
-    if (write(fd, &a, sizeof(a)) == -1) {
-        perror("Failed to write to the file");
-        unlock_file(fd); // Unlock before returning
+    // Attempt to acquire the write lock
+    printf("************************************\n");
+    printf("* Waiting to acquire the lock for  *\n");
+    printf("* writing...                       *\n");
+    printf("************************************\n");
+    if (fcntl(fd, F_SETLKW, &lock) == -1) {
+        perror("fcntl");
         close(fd);
+        execvp(ExitPath, argv); // Go to ExitPath on error
         return 1;
     }
 
-    const char *msg = "Admin account created and data written to file\n";
-    write(STDOUT_FILENO, msg, strlen(msg));
+    // Ask for username
+    char username[20], password[20];
+    printf("************************************\n");
+    printf("* Please enter the name of the     *\n");
+    printf("* Admin to be added             *\n");
+    printf("************************************\n");
+    printf("Enter the username: ");
+    if (read(STDIN_FILENO, username, sizeof(username)) == -1) {
+        perror("read");
+        lock.l_type = F_UNLCK; // Unlock
+        fcntl(fd, F_SETLK, &lock);
+        close(fd);
+        execvp(ExitPath, argv); // Go to ExitPath on error
+        return 1;
+    }
+    remove_newline(username);
 
-    // Unlock the record after writing
-    unlock_file(fd);
+    // Check if the username exists
+    if (username_exists(fd, username)) {
+        printf("************************************\n");
+        printf("* Username already exists!         *\n");
+        printf("* Redirecting to admin actions...  *\n");
+        printf("************************************\n");
+        lock.l_type = F_UNLCK; // Unlock
+        fcntl(fd, F_SETLK, &lock);
+        close(fd);
+        execvp(AdminActionsPath, argv); // Redirect to admin actions
+        return 1;
+    }
+
+    // Ask the admin to create a password
+    printf("************************************\n");
+    printf("* Ask the admin to create a     *\n");
+    printf("* password                         *\n");
+    printf("************************************\n");
+    if (read(STDIN_FILENO, password, sizeof(password)) == -1) {
+        perror("read");
+        lock.l_type = F_UNLCK; // Unlock
+        fcntl(fd, F_SETLK, &lock);
+        close(fd);
+        execvp(ExitPath, argv); // Go to ExitPath on error
+        return 1;
+    }
+    remove_newline(password);
+
+    struct AdminLogin e;
+    strncpy(e.username, username, sizeof(e.username) - 1);
+
+    // Hash the password
+    if (crypto_pwhash_str(e.hashed_password, password, strlen(password), 
+                           crypto_pwhash_OPSLIMIT_INTERACTIVE, 
+                           crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
+        printf("************************************\n");
+        printf("* Error hashing the password       *\n");
+        printf("************************************\n");
+        lock.l_type = F_UNLCK; // Unlock in case of error
+        fcntl(fd, F_SETLK, &lock);
+        close(fd);
+        execvp(ExitPath, argv); // Go to ExitPath on error
+        return 1;
+    }
+    
+    strncpy(e.loggedin, "n", sizeof(e.loggedin) - 1);
+
+    // Add the admin
+    add_admin(fd, &e);
+
+    // Unlock the file
+    lock.l_type = F_UNLCK; // Unlock
+    fcntl(fd, F_SETLK, &lock);
     close(fd);
 
-    // Socket programming to send admin data to server
+    // Socket programming to send admin data to server using stream sockets
     int sockfd;
     struct sockaddr_un server_addr;
 
     if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
         perror("socket");
-        exit(1);
+        execvp(ExitPath, argv); // Go to ExitPath on error
+        return 1;
     }
 
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sun_family = AF_UNIX;
-
+    
     // Set up socket path
     strncpy(server_addr.sun_path, SOCKET_PATH, sizeof(server_addr.sun_path) - 1);
 
@@ -179,21 +196,26 @@ int main() {
     if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
         perror("connect");
         close(sockfd);
-        exit(1);
+        execvp(ExitPath, argv); // Go to ExitPath on error
+        return 1;
     }
+
+    // Prepare the operation structure
+    struct Operation op;
+    strncpy(op.operation, "addadmin", sizeof(op.operation) - 1);
+    op.admin = e;
 
     // Send the operation to the server
     if (send(sockfd, &op, sizeof(op), 0) == -1) {
         perror("send");
         close(sockfd);
-        exit(1);
+        execvp(ExitPath, argv); // Go to ExitPath on error
+        return 1;
     }
 
-    const char *msg2 = "Admin data sent to server\n";
-    write(STDOUT_FILENO, msg2, strlen(msg2));
-
-    // Close the socket
     close(sockfd);
 
-    return 0;
+    execvp(ExitPath, NULL); // Return to admin actions
+    perror("execvp failed"); // In case execvp fails
+    return 1;
 }

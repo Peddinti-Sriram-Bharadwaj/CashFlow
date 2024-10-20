@@ -14,6 +14,9 @@ void write_message(const char *message) {
 }
 
 int main(int argc, char* argv[]) {
+  char ManagerActionsPath[BUFFER_SIZE];
+  snprintf(ManagerActionsPath, sizeof(ManagerActionsPath), "%s%s", basePath, "/Manager/manager.out");
+  
   char ExitPath[BUFFER_SIZE];
   snprintf(ExitPath, sizeof(ExitPath), "%s%s", basePath, "/welcome.out");
 
@@ -31,6 +34,9 @@ int main(int argc, char* argv[]) {
 
   char changePasswordPath[BUFFER_SIZE];
   snprintf(changePasswordPath, sizeof(changePasswordPath), "%s%s", basePath, "/Manager/changePassword.out");
+
+  char getFeedbackPath[BUFFER_SIZE];
+  snprintf(getFeedbackPath, sizeof(getFeedbackPath), "%s%s", basePath, "/Manager/getFeedback.out");
 
   char* username = argv[0];
 
@@ -79,6 +85,7 @@ int main(int argc, char* argv[]) {
       break;
     case 5:
       write_message("review customer feedback\n");
+      execvp(getFeedbackPath, argv);
       break;
     case 6:
       write_message("change password\n");

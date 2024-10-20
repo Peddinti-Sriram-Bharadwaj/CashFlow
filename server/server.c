@@ -11,6 +11,13 @@
 #define SOCKET_PATH "/tmp/server"
 #define BUFFER_SIZE 256
 
+pthread_rwlock_t admins_lock = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t customers_lock = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t employees_lock = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t feedbacks_lock = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t loanApplications_lock = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t managers_lock = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t transactions_lock = PTHREAD_RWLOCK_INITIALIZER;
 
 
 struct Customer {
@@ -136,19 +143,55 @@ struct LoanApprovalRequest {
     int amount;         // Amount of the loan
 };
 
+struct FeedbackQuery {
+    char username[20];
+    int client_sockfd;
+};
+
+
+void write_string(int fd, const char *str) {
+    write(fd, str, strlen(str));
+}
+
+void read_string(int fd, char *buffer, size_t size) {
+    ssize_t bytes_read = read(fd, buffer, size - 1);
+    if (bytes_read > 0) {
+        buffer[bytes_read] = '\0';
+    }
+}
+
 
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
 
+void trim_whitespace(char *str) {
+    char *end;
+
+    // Trim leading space
+    while (isspace((unsigned char)*str)) str++;
+
+    // Trim trailing space
+    end = str + strlen(str) - 1;
+    while (end > str && isspace((unsigned char)*end)) end--;
+
+    // Null terminate the trimmed string
+    *(end + 1) = '\0';
+}
+
+
+// Function to add a customer
 void *addcustomer(void *arg) {
     struct Customer *customer = (struct Customer *)arg;
 
+    // Lock customers for writing
+    pthread_rwlock_wrlock(&customers_lock);
 
     // Open the customers file for appending (using system call)
     int customer_fd = open("customers.txt", O_WRONLY | O_APPEND | O_CREAT, 0644);
     if (customer_fd == -1) {
         perror("open");
+        pthread_rwlock_unlock(&customers_lock);
         pthread_exit(NULL);
     }
 
@@ -156,16 +199,22 @@ void *addcustomer(void *arg) {
     if (write(customer_fd, customer, sizeof(struct Customer)) == -1) {
         perror("write");
         close(customer_fd);
+        pthread_rwlock_unlock(&customers_lock);
         pthread_exit(NULL);
     }
 
     close(customer_fd);
+    // Unlock customers after writing
+    pthread_rwlock_unlock(&customers_lock);
 
+    // Lock transactions for writing
+    pthread_rwlock_wrlock(&transactions_lock);
 
     // Open the transactions file for appending (using system call)
     int passbook_fd = open("transactions.txt", O_WRONLY | O_APPEND | O_CREAT, 0644);
     if (passbook_fd == -1) {
         perror("open");
+        pthread_rwlock_unlock(&transactions_lock);
         pthread_exit(NULL);
     }
 
@@ -178,34 +227,45 @@ void *addcustomer(void *arg) {
     if (write(passbook_fd, &passbook, sizeof(struct Passbook)) == -1) {
         perror("write");
         close(passbook_fd);
+        pthread_rwlock_unlock(&transactions_lock);
         pthread_exit(NULL);
     }
 
     close(passbook_fd);
-
+    // Unlock transactions after writing
+    pthread_rwlock_unlock(&transactions_lock);
 
     pthread_exit(NULL);
 }
 
 
+// Function to add an admin
 void *addadmin(void *arg) {
     struct Admin *admin = (struct Admin *)arg;
 
+    // Lock admins for writing
+    pthread_rwlock_wrlock(&admins_lock);
 
+    // Open the admins file for appending (using standard I/O)
     FILE *file = fopen("admins.txt", "ab");
     if (file == NULL) {
         perror("fopen");
+        pthread_rwlock_unlock(&admins_lock); // Unlock before exiting
         pthread_exit(NULL);
     }
 
+    // Write the admin data to the file
     if (fwrite(admin, sizeof(struct Admin), 1, file) != 1) {
         perror("fwrite");
         fclose(file);
+        pthread_rwlock_unlock(&admins_lock); // Unlock before exiting
         pthread_exit(NULL);
     }
 
     fclose(file);
 
+    // Unlock admins after writing
+    pthread_rwlock_unlock(&admins_lock);
 
     pthread_exit(NULL);
 }
@@ -214,28 +274,34 @@ void *addadmin(void *arg) {
 void *addemployee(void *arg) {
     struct Employee *employee = (struct Employee *)arg;
 
+    // Lock employees for writing
+    pthread_rwlock_wrlock(&employees_lock);
+
     // Initialize processing usernames to "None"
     for (int i = 0; i < MAX_EMPLOYEES; i++) {
         strncpy(employee->processing_usernames[i], "None", sizeof(employee->processing_usernames[i]) - 1);
         employee->processing_usernames[i][sizeof(employee->processing_usernames[i]) - 1] = '\0'; // Null-terminate
     }
 
-    // Open the employees file for appending (using system call)
-    int employee_fd = open("employees.txt", O_WRONLY | O_APPEND | O_CREAT, 0644);
-    if (employee_fd == -1) {
-        perror("open");
+    // Open the employees file for appending
+    FILE *file = fopen("employees.txt", "ab");
+    if (file == NULL) {
+        perror("fopen");
+        pthread_rwlock_unlock(&employees_lock); // Unlock before exiting
         pthread_exit(NULL);
     }
 
-    // Write the employee data to the file (using system call)
-    if (write(employee_fd, employee, sizeof(struct Employee)) == -1) {
-        perror("write");
-        close(employee_fd);
+    // Write the employee data to the file
+    if (fwrite(employee, sizeof(struct Employee), 1, file) != 1) {
+        perror("fwrite");
+        fclose(file);
+        pthread_rwlock_unlock(&employees_lock); // Unlock before exiting
         pthread_exit(NULL);
     }
 
-    close(employee_fd);
-
+    fclose(file);
+    // Unlock employees after writing
+    pthread_rwlock_unlock(&employees_lock);
 
     pthread_exit(NULL);
 }
@@ -244,26 +310,33 @@ void *addemployee(void *arg) {
 void *addmanager(void *arg) {
     struct Manager *manager = (struct Manager *)arg;
 
-    // Open the managers file for appending (using system call)
-    int manager_fd = open("managers.txt", O_WRONLY | O_APPEND | O_CREAT, 0644);
-    if (manager_fd == -1) {
-        perror("open");
+    // Lock managers for writing
+    pthread_rwlock_wrlock(&managers_lock);
+
+    // Open the managers file for appending
+    FILE *file = fopen("managers.txt", "ab");
+    if (file == NULL) {
+        perror("fopen");
+        pthread_rwlock_unlock(&managers_lock); // Unlock before exiting
         pthread_exit(NULL);
     }
 
-    // Write the manager data to the file (using system call)
-    if (write(manager_fd, manager, sizeof(struct Manager)) == -1) {
-        perror("write");
-        close(manager_fd);
+    // Write the manager data to the file
+    if (fwrite(manager, sizeof(struct Manager), 1, file) != 1) {
+        perror("fwrite");
+        fclose(file);
+        pthread_rwlock_unlock(&managers_lock); // Unlock before exiting
         pthread_exit(NULL);
     }
 
-    close(manager_fd);
+    fclose(file);
+    // Unlock managers after writing
+    pthread_rwlock_unlock(&managers_lock);
 
     pthread_exit(NULL);
 }
 
-
+// Function to get balance
 void *getbalance(void *arg) {
     struct BalanceRequest *request = (struct BalanceRequest *)arg;
     int client_sockfd = request->client_sockfd;
@@ -279,9 +352,13 @@ void *getbalance(void *arg) {
     // Log the request details
     printf("Getting balance for customer: %s\n", request->customer.username);
 
+    // Lock customers for reading
+    pthread_rwlock_rdlock(&customers_lock);
+
     FILE *file = fopen("customers.txt", "rb");
     if (file == NULL) {
         perror("Failed to open customers.txt");
+        pthread_rwlock_unlock(&customers_lock); // Unlock before exiting
         free(request); // Free memory before exiting
         pthread_exit(NULL);
     }
@@ -320,6 +397,7 @@ void *getbalance(void *arg) {
     }
 
     fclose(file); // Close the file
+    pthread_rwlock_unlock(&customers_lock); // Unlock after reading
 
     // Free allocated memory for the request
     free(request); // Make sure to free the allocated memory for request
@@ -331,6 +409,7 @@ void *getbalance(void *arg) {
 
 
 
+// Function to handle loan applications
 void *handle_loan_application(void *arg) {
     struct LoanRequest *request = (struct LoanRequest *)arg;
     int client_sockfd = request->client_sockfd;
@@ -341,6 +420,7 @@ void *handle_loan_application(void *arg) {
     if (num_bytes_sent == -1) {
         perror("send");
         close(client_sockfd);
+        free(request); // Free allocated memory for the request
         pthread_exit(NULL);
     }
 
@@ -350,6 +430,7 @@ void *handle_loan_application(void *arg) {
     if (num_bytes_received == -1) {
         perror("recv");
         close(client_sockfd);
+        free(request); // Free allocated memory for the request
         pthread_exit(NULL);
     }
 
@@ -361,28 +442,35 @@ void *handle_loan_application(void *arg) {
     strncpy(loan_application.assigned_employee, "None", sizeof(loan_application.assigned_employee) - 1);
     loan_application.assigned_employee[sizeof(loan_application.assigned_employee) - 1] = '\0'; // Null-terminate
 
+    // Lock loanApplications for writing
+    pthread_rwlock_wrlock(&loanApplications_lock);
 
     // Write the structure to the loanApplications.txt file
     FILE *file = fopen("loanApplications.txt", "ab");
     if (file == NULL) {
         perror("fopen");
+        pthread_rwlock_unlock(&loanApplications_lock); // Unlock before exiting
         close(client_sockfd);
+        free(request); // Free allocated memory for the request
         pthread_exit(NULL);
     }
 
     if (fwrite(&loan_application, sizeof(struct LoanApplication), 1, file) != 1) {
         perror("fwrite");
         fclose(file);
+        pthread_rwlock_unlock(&loanApplications_lock); // Unlock before exiting
 
         // Send failure response to the client
         int failure_message = -1;
         send(client_sockfd, &failure_message, sizeof(failure_message), 0);
 
         close(client_sockfd);
+        free(request); // Free allocated memory for the request
         pthread_exit(NULL);
     }
 
     fclose(file);
+    pthread_rwlock_unlock(&loanApplications_lock); // Unlock after writing
 
     // Step 5: Send success message to the client
     int success_message = 1;
@@ -391,9 +479,9 @@ void *handle_loan_application(void *arg) {
         perror("send");
     }
 
-
     // Step 7: Clean up and exit the thread
     close(client_sockfd);
+    free(request); // Free allocated memory for the request
     pthread_exit(NULL);
 }
 
@@ -402,10 +490,13 @@ void *update_username(void *arg) {
     int client_sockfd = request->client_sockfd;
     char *current_username = request->username;
 
+    // Lock customers for reading and writing
+    pthread_rwlock_wrlock(&customers_lock);
 
     FILE *customer_file = fopen("customers.txt", "rb+");
     if (customer_file == NULL) {
         perror("fopen customers.txt");
+        pthread_rwlock_unlock(&customers_lock); // Unlock before exiting
         pthread_exit(NULL);
     }
 
@@ -420,18 +511,20 @@ void *update_username(void *arg) {
         }
     }
 
+    // If user not found, unlock and exit
     if (!user_found) {
         fclose(customer_file);
+        pthread_rwlock_unlock(&customers_lock); // Unlock before exiting
         pthread_exit(NULL);
     }
 
     // Send the message "newname" to the client, asking for the new username
     char message[] = "newname";
-    printf("%s\n", message);   
     ssize_t num_bytes_sent = send(client_sockfd, message, sizeof(message), 0);
     if (num_bytes_sent == -1) {
         perror("send newname request");
         fclose(customer_file);
+        pthread_rwlock_unlock(&customers_lock); // Unlock before exiting
         pthread_exit(NULL);
     }
 
@@ -441,6 +534,7 @@ void *update_username(void *arg) {
     if (num_bytes_received == -1) {
         perror("recv new_username");
         fclose(customer_file);
+        pthread_rwlock_unlock(&customers_lock); // Unlock before exiting
         pthread_exit(NULL);
     }
     new_username[num_bytes_received] = '\0';  // Null-terminate the new username
@@ -453,13 +547,12 @@ void *update_username(void *arg) {
             int response = -1;
             send(client_sockfd, &response, sizeof(response), 0);
             fclose(customer_file);
+            pthread_rwlock_unlock(&customers_lock); // Unlock before exiting
             pthread_exit(NULL);
         }
     }
 
-    // New username is available, update the passbook and customer files
-
-    // Rewind the file again to update the current user's name
+    // New username is available, update the customer file
     rewind(customer_file);
     while (fread(&customer, sizeof(struct Customer), 1, customer_file) == 1) {
         if (strcmp(customer.username, current_username) == 0) {
@@ -474,16 +567,20 @@ void *update_username(void *arg) {
     }
 
     fclose(customer_file);
+    pthread_rwlock_unlock(&customers_lock); // Unlock after updating customer file
 
     // Open transactions.txt to update the passbook and transactions
+    pthread_rwlock_wrlock(&transactions_lock);
+    
     FILE *transaction_file = fopen("transactions.txt", "rb+");
     if (transaction_file == NULL) {
         perror("fopen transactions.txt");
+        pthread_rwlock_unlock(&transactions_lock); // Unlock before exiting
         pthread_exit(NULL);
     }
 
     struct Passbook passbook;
-    // Iterate through the passbooks to update the username and target transactions
+    // Iterate through the passbooks to update the username
     while (fread(&passbook, sizeof(struct Passbook), 1, transaction_file) == 1) {
         if (strcmp(passbook.username, current_username) == 0) {
             // Update the username in the passbook
@@ -508,12 +605,15 @@ void *update_username(void *arg) {
     }
 
     fclose(transaction_file);
+    pthread_rwlock_unlock(&transactions_lock); // Unlock after updating transactions
 
-
-        // Open loanApplications.txt to update the username in loan applications
+    // Open loanApplications.txt to update the username in loan applications
+    pthread_rwlock_wrlock(&loanApplications_lock);
+    
     FILE *loan_file = fopen("loanApplications.txt", "rb+");
     if (loan_file == NULL) {
         perror("fopen loanApplications.txt");
+        pthread_rwlock_unlock(&loanApplications_lock); // Unlock before exiting
         pthread_exit(NULL);
     }
 
@@ -531,7 +631,7 @@ void *update_username(void *arg) {
     }
 
     fclose(loan_file);
-
+    pthread_rwlock_unlock(&loanApplications_lock); // Unlock after updating loan applications
 
     // Send a success message to the client
     int success = 1;
@@ -539,6 +639,7 @@ void *update_username(void *arg) {
 
     pthread_exit(NULL);
 }
+
 
 
 void *handle_deposit_application(void *arg) {
@@ -569,17 +670,20 @@ void *handle_deposit_application(void *arg) {
         pthread_exit(NULL);
     }
 
-    // Step 3: Read the customers file and update the balance for the specified customer
+    // Step 3: Lock customers.txt for reading and writing
+    pthread_rwlock_wrlock(&customers_lock);
+
+    // Read the customers file and update the balance for the specified customer
     FILE *file = fopen("customers.txt", "r+b");
     if (file == NULL) {
         perror("fopen");
         close(client_sockfd);
+        pthread_rwlock_unlock(&customers_lock); // Unlock before exiting
         pthread_exit(NULL);
     }
 
     struct Customer temp_customer;
     int found = 0;
-
 
     // Search for the customer and update their balance
     while (fread(&temp_customer, sizeof(struct Customer), 1, file) == 1) {
@@ -597,6 +701,7 @@ void *handle_deposit_application(void *arg) {
                 perror("fopen transactions.txt");
                 fclose(file);
                 close(client_sockfd);
+                pthread_rwlock_unlock(&customers_lock); // Unlock before exiting
                 pthread_exit(NULL);
             }
 
@@ -631,8 +736,8 @@ void *handle_deposit_application(void *arg) {
         }
     }
 
-
     fclose(file);
+    pthread_rwlock_unlock(&customers_lock); // Unlock after updating customer file
 
     // Step 4: Send success or failure message to the client
     int response = found ? 1 : -1;
@@ -647,6 +752,7 @@ void *handle_deposit_application(void *arg) {
     close(client_sockfd);
     pthread_exit(NULL);
 }
+
 
 void *handle_transfer_money(void *arg) {
     struct TransferRequest *request = (struct TransferRequest *)arg;
@@ -689,17 +795,20 @@ void *handle_transfer_money(void *arg) {
         pthread_exit(NULL);
     }
 
-    // Step 5: Read the customers file and check if the recipient exists
+    // Step 5: Lock customers.txt for reading and writing
+    pthread_rwlock_wrlock(&customers_lock);
+
+    // Read the customers file and check if the recipient exists
     FILE *file = fopen("customers.txt", "r+b");
     if (file == NULL) {
         perror("fopen");
         close(client_sockfd);
+        pthread_rwlock_unlock(&customers_lock); // Unlock before exiting
         pthread_exit(NULL);
     }
 
     struct Customer temp_customer;
     int sender_found = 0, receiver_found = 0;
-
 
     // Search for the recipient in the customers file first
     while (fread(&temp_customer, sizeof(struct Customer), 1, file) == 1) {
@@ -740,6 +849,7 @@ void *handle_transfer_money(void *arg) {
                         perror("fopen transactions.txt");
                         fclose(file);
                         close(client_sockfd);
+                        pthread_rwlock_unlock(&customers_lock); // Unlock before exiting
                         pthread_exit(NULL);
                     }
 
@@ -797,6 +907,7 @@ void *handle_transfer_money(void *arg) {
     }
 
     fclose(file);
+    pthread_rwlock_unlock(&customers_lock); // Unlock after processing the transaction
 
     // Step 6: Send success or failure message to the client
     int response = (sender_found && receiver_found) ? 1 : -1;
@@ -806,6 +917,7 @@ void *handle_transfer_money(void *arg) {
     close(client_sockfd);
     pthread_exit(NULL);
 }
+
 
 
 void *handle_withdrawal_application(void *arg) {
@@ -830,17 +942,20 @@ void *handle_withdrawal_application(void *arg) {
         pthread_exit(NULL);
     }
 
-    // Step 3: Read the customers file and update the balance for the specified customer
+    // Step 3: Lock customers.txt for writing
+    pthread_rwlock_wrlock(&customers_lock);
+
+    // Open the customers file for reading and writing
     FILE *file = fopen("customers.txt", "r+b");
     if (file == NULL) {
         perror("fopen");
         close(client_sockfd);
+        pthread_rwlock_unlock(&customers_lock); // Unlock before exiting
         pthread_exit(NULL);
     }
 
     struct Customer temp_customer;
     int found = 0;
-
 
     // Search for the customer and check if withdrawal is possible
     while (fread(&temp_customer, sizeof(struct Customer), 1, file) == 1) {
@@ -861,6 +976,7 @@ void *handle_withdrawal_application(void *arg) {
                     perror("fopen transactions.txt");
                     fclose(file);
                     close(client_sockfd);
+                    pthread_rwlock_unlock(&customers_lock); // Unlock before exiting
                     pthread_exit(NULL);
                 }
 
@@ -876,7 +992,7 @@ void *handle_withdrawal_application(void *arg) {
                         struct Transaction withdrawal_transaction;
                         strcpy(withdrawal_transaction.type, "Withdrawal");
                         withdrawal_transaction.amount = withdrawal_amount;
-                        strcpy(withdrawal_transaction.date, "2024-10-19"); // You can set the actual date here
+                        strcpy(withdrawal_transaction.date, "2024-10-19"); // Set the actual date here
                         strcpy(withdrawal_transaction.from_username, request->username);
                         strcpy(withdrawal_transaction.to_username, request->username);
 
@@ -900,12 +1016,12 @@ void *handle_withdrawal_application(void *arg) {
                 int response = -1; // Failure
                 send(client_sockfd, &response, sizeof(response), 0);
             }
-            break;
+            break; // Exit loop after processing
         }
     }
 
-
     fclose(file);
+    pthread_rwlock_unlock(&customers_lock); // Unlock after processing the transaction
 
     // If customer not found, send failure response
     if (!found) {
@@ -920,16 +1036,19 @@ void *handle_withdrawal_application(void *arg) {
 
 
 
+
 void *getpassbook(void *arg) {
     struct PassbookRequest *request = (struct PassbookRequest *)arg;
     int client_sockfd = request->client_sockfd;
     char *username = request->username;
-    printf("username: %s\n", username);
 
+    // Lock transactions.txt for reading
+    pthread_rwlock_rdlock(&transactions_lock);
 
     FILE *file = fopen("transactions.txt", "rb");
     if (file == NULL) {
         perror("fopen");
+        pthread_rwlock_unlock(&transactions_lock); // Unlock before exiting
         pthread_exit(NULL);
     }
 
@@ -941,7 +1060,6 @@ void *getpassbook(void *arg) {
         // Check if the username matches
         if (strcmp(passbook.username, username) == 0) {
             found = 1;
-            printf("Found passbook for user: %s\n", username);
 
             // Send the passbook structure to the client
             ssize_t num_bytes_sent = send(client_sockfd, &passbook, sizeof(passbook), 0);
@@ -949,6 +1067,8 @@ void *getpassbook(void *arg) {
                 perror("send");
                 // Close socket and exit thread if the send failed
                 close(client_sockfd);
+                fclose(file);
+                pthread_rwlock_unlock(&transactions_lock); // Unlock before exiting
                 pthread_exit(NULL);
             }
             break;
@@ -956,7 +1076,7 @@ void *getpassbook(void *arg) {
     }
 
     fclose(file);
-
+    pthread_rwlock_unlock(&transactions_lock); // Unlock after processing the transaction file
 
     // If passbook not found, send an error message
     if (!found) {
@@ -971,6 +1091,7 @@ void *getpassbook(void *arg) {
     close(client_sockfd);
     pthread_exit(NULL);
 }
+
 
 
 void *handle_feedback_request(void *arg) {
@@ -1001,23 +1122,27 @@ void *handle_feedback_request(void *arg) {
 
     // Ensure null-termination
     feedback.feedback[sizeof(feedback.feedback) - 1] = '\0'; // Null-terminate
-    // Optionally, truncate feedback if it's longer than 100 characters
+    // Truncate feedback if it's longer than 100 characters
     if (strlen(feedback.feedback) > 100) {
         feedback.feedback[100] = '\0';
     }
 
+    // Lock the feedbacks file for writing
+    pthread_rwlock_wrlock(&feedbacks_lock);
 
     // Write the structure to the feedbacks.txt file
     FILE *file = fopen("feedbacks.txt", "ab");
     if (file == NULL) {
         perror("fopen");
+        pthread_rwlock_unlock(&feedbacks_lock); // Unlock before exiting
         close(client_sockfd);
         pthread_exit(NULL);
     }
 
     if (fwrite(&feedback, sizeof(struct Feedback), 1, file) != 1) {
         perror("fwrite");
-        fclose(file);
+        fclose(file); // Close the file before exiting
+        pthread_rwlock_unlock(&feedbacks_lock); // Unlock before exiting
 
         // Send failure response to the client
         int failure_message = -1;
@@ -1027,7 +1152,8 @@ void *handle_feedback_request(void *arg) {
         pthread_exit(NULL);
     }
 
-    fclose(file);
+    fclose(file); // Close the feedback file after writing
+    pthread_rwlock_unlock(&feedbacks_lock); // Unlock after writing
 
     // Step 4: Send success message to the client
     int success_message = 1;
@@ -1041,14 +1167,20 @@ void *handle_feedback_request(void *arg) {
     pthread_exit(NULL);
 }
 
+
+
 void *handle_list_pending_loan_applications(void *arg) {
     struct LoanRequest *request = (struct LoanRequest *)arg;
     int client_sockfd = request->client_sockfd;
 
-    // Step 1: Open the loanApplications.txt file for reading
+    // Step 1: Lock the loan applications file for reading
+    pthread_rwlock_rdlock(&loanApplications_lock);
+
+    // Open the loanApplications.txt file for reading
     FILE *file = fopen("loanApplications.txt", "rb");
     if (file == NULL) {
         perror("fopen");
+        pthread_rwlock_unlock(&loanApplications_lock); // Unlock before exiting
         close(client_sockfd);
         pthread_exit(NULL);
     }
@@ -1068,6 +1200,7 @@ void *handle_list_pending_loan_applications(void *arg) {
     if (num_bytes_sent == -1) {
         perror("send");
         fclose(file);
+        pthread_rwlock_unlock(&loanApplications_lock); // Unlock before exiting
         close(client_sockfd);
         pthread_exit(NULL);
     }
@@ -1083,6 +1216,7 @@ void *handle_list_pending_loan_applications(void *arg) {
             if (num_bytes_sent == -1) {
                 perror("send");
                 fclose(file);
+                pthread_rwlock_unlock(&loanApplications_lock); // Unlock before exiting
                 close(client_sockfd);
                 pthread_exit(NULL);
             }
@@ -1093,6 +1227,7 @@ void *handle_list_pending_loan_applications(void *arg) {
             if (num_bytes_received == -1) {
                 perror("recv");
                 fclose(file);
+                pthread_rwlock_unlock(&loanApplications_lock); // Unlock before exiting
                 close(client_sockfd);
                 pthread_exit(NULL);
             }
@@ -1106,18 +1241,22 @@ void *handle_list_pending_loan_applications(void *arg) {
 
     // Step 7: Close the file and clean up
     fclose(file);
+    pthread_rwlock_unlock(&loanApplications_lock); // Unlock after reading
     close(client_sockfd);
     pthread_exit(NULL);
 }
 
-// Function to handle listing employees with at least one None in processing_usernames
 void *handle_pending_employees(void *arg) {
     struct LoanRequest *request = (struct LoanRequest *)arg;
     int client_sockfd = request->client_sockfd;
 
+    // Step 1: Lock the employees file for reading
+    pthread_rwlock_rdlock(&employees_lock);
+
     FILE *file = fopen("employees.txt", "rb");
     if (file == NULL) {
         perror("fopen");
+        pthread_rwlock_unlock(&employees_lock); // Unlock before exiting
         close(client_sockfd);
         pthread_exit(NULL);
     }
@@ -1136,7 +1275,14 @@ void *handle_pending_employees(void *arg) {
     }
 
     // Send the count of pending employees to the client
-    send(client_sockfd, &pending_count, sizeof(pending_count), 0);
+    ssize_t send_status = send(client_sockfd, &pending_count, sizeof(pending_count), 0);
+    if (send_status == -1) {
+        perror("send");
+        fclose(file);
+        pthread_rwlock_unlock(&employees_lock); // Unlock before exiting
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
     
     // Reset file pointer to the beginning for the second pass
     fseek(file, 0, SEEK_SET);
@@ -1146,18 +1292,36 @@ void *handle_pending_employees(void *arg) {
         for (int i = 0; i < MAX_EMPLOYEES; i++) {
             if (strcmp(employee.processing_usernames[i], "None") == 0) {
                 // Send employee details to the client
-                send(client_sockfd, &employee, sizeof(struct Employee), 0);
+                send_status = send(client_sockfd, &employee, sizeof(struct Employee), 0);
+                if (send_status == -1) {
+                    perror("send");
+                    fclose(file);
+                    pthread_rwlock_unlock(&employees_lock); // Unlock before exiting
+                    close(client_sockfd);
+                    pthread_exit(NULL);
+                }
+
                 int ack;
-                recv(client_sockfd, &ack, sizeof(ack), 0); // Wait for acknowledgment
+                ssize_t recv_status = recv(client_sockfd, &ack, sizeof(ack), 0); // Wait for acknowledgment
+                if (recv_status == -1) {
+                    perror("recv");
+                    fclose(file);
+                    pthread_rwlock_unlock(&employees_lock); // Unlock before exiting
+                    close(client_sockfd);
+                    pthread_exit(NULL);
+                }
                 break; // No need to check other usernames for this employee
             }
         }
     }
 
+    // Step 7: Close the file and clean up
     fclose(file);
+    pthread_rwlock_unlock(&employees_lock); // Unlock after reading
     close(client_sockfd);
     pthread_exit(NULL);
 }
+
 
 void *handle_assign_loan_to_employee(void *arg) {
     int client_sockfd = *(int *)arg;
@@ -1171,9 +1335,12 @@ void *handle_assign_loan_to_employee(void *arg) {
     recv(client_sockfd, loan_applicant_username, sizeof(loan_applicant_username), 0);
     printf("Received loan applicant username: %s\n", loan_applicant_username);
 
+    // Step 2: Lock the loan applications file for reading
+    pthread_rwlock_rdlock(&loanApplications_lock);
     FILE *loan_file = fopen("loanApplications.txt", "r+b");
     if (!loan_file) {
         perror("fopen loanApplications");
+        pthread_rwlock_unlock(&loanApplications_lock); // Unlock before exiting
         close(client_sockfd);
         pthread_exit(NULL);
     }
@@ -1192,11 +1359,12 @@ void *handle_assign_loan_to_employee(void *arg) {
     if (!loan_found) {
         printf("Loan application for %s not found or already assigned.\n", loan_applicant_username);
         fclose(loan_file);
+        pthread_rwlock_unlock(&loanApplications_lock); // Unlock before exiting
         close(client_sockfd);
         pthread_exit(NULL);
     }
 
-    // Step 2: Ask the client for the employee's username
+    // Step 3: Ask the client for the employee's username
     strcpy(keyword, "employee");
     send(client_sockfd, keyword, sizeof(keyword), 0);
 
@@ -1204,10 +1372,13 @@ void *handle_assign_loan_to_employee(void *arg) {
     recv(client_sockfd, employee_username, sizeof(employee_username), 0);
     printf("Received employee username: %s\n", employee_username);
 
+    // Step 4: Lock the employee file for reading and writing
+    pthread_rwlock_wrlock(&employees_lock);
     FILE *employee_file = fopen("employees.txt", "r+b");
     if (!employee_file) {
         perror("fopen employees");
         fclose(loan_file);
+        pthread_rwlock_unlock(&loanApplications_lock); // Unlock loan applications lock before exiting
         close(client_sockfd);
         pthread_exit(NULL);
     }
@@ -1251,7 +1422,11 @@ void *handle_assign_loan_to_employee(void *arg) {
     fclose(loan_file);
     fclose(employee_file);
 
-    // Step 3: Send result of the operation to the client
+    // Step 5: Unlock the locks
+    pthread_rwlock_unlock(&employees_lock); // Unlock employee file
+    pthread_rwlock_unlock(&loanApplications_lock); // Unlock loan applications file
+
+    // Step 6: Send result of the operation to the client
     if (loan_assigned) {
         char success_msg[] = "Loan successfully assigned!";
         send(client_sockfd, success_msg, sizeof(success_msg), 0);
@@ -1267,6 +1442,7 @@ void *handle_assign_loan_to_employee(void *arg) {
     pthread_exit(NULL);
 }
 
+
 void *handle_get_employee_loans(void *arg) {
     struct EmployeeLoanRequest *loan_request = (struct EmployeeLoanRequest *)arg;
     int client_sockfd = loan_request->client_sockfd;
@@ -1274,11 +1450,23 @@ void *handle_get_employee_loans(void *arg) {
     strcpy(employee_username, loan_request->employee_username); // Copy employee username
     free(loan_request); // Free the loan request structure
 
-    // Step 2: Open employees.txt and loanApplications.txt
+    // Step 1: Lock the employees file for reading
+    pthread_rwlock_rdlock(&employees_lock);
     FILE *employee_file = fopen("employees.txt", "rb");
-    FILE *loan_file = fopen("loanApplications.txt", "rb");
-    if (!employee_file || !loan_file) {
+    if (!employee_file) {
         perror("File open error");
+        pthread_rwlock_unlock(&employees_lock); // Unlock before exiting
+        close(client_sockfd);
+        pthread_exit(NULL);
+    }
+
+    // Step 2: Lock the loan applications file for reading
+    pthread_rwlock_rdlock(&loanApplications_lock);
+    FILE *loan_file = fopen("loanApplications.txt", "rb");
+    if (!loan_file) {
+        perror("File open error");
+        fclose(employee_file);
+        pthread_rwlock_unlock(&employees_lock); // Unlock before exiting
         close(client_sockfd);
         pthread_exit(NULL);
     }
@@ -1295,9 +1483,11 @@ void *handle_get_employee_loans(void *arg) {
 
     if (!employee_found) {
         printf("Employee %s not found.\n", employee_username);
-        close(client_sockfd);
         fclose(employee_file);
         fclose(loan_file);
+        pthread_rwlock_unlock(&loanApplications_lock); // Unlock loan applications lock before exiting
+        pthread_rwlock_unlock(&employees_lock); // Unlock employees lock before exiting
+        close(client_sockfd);
         pthread_exit(NULL);
     }
 
@@ -1326,9 +1516,15 @@ void *handle_get_employee_loans(void *arg) {
     // Close the files and socket
     fclose(employee_file);
     fclose(loan_file);
+    
+    // Step 7: Unlock the locks
+    pthread_rwlock_unlock(&loanApplications_lock); // Unlock loan applications lock
+    pthread_rwlock_unlock(&employees_lock); // Unlock employees lock
+
     close(client_sockfd);
     pthread_exit(NULL);
 }
+
 
 void *handle_loan_approval(void *arg) {
     struct EmployeeLoanRequest *loan_request = (struct EmployeeLoanRequest *)arg;
@@ -1337,8 +1533,6 @@ void *handle_loan_approval(void *arg) {
     strncpy(employee_username, loan_request->employee_username, sizeof(employee_username) - 1);
     employee_username[sizeof(employee_username) - 1] = '\0'; // Ensure null-termination
     free(loan_request);
-    printf("%s\n",employee_username);
-
 
     // Step 1: Send request for customer username
     if (send(client_sockfd, "username", sizeof("username"), 0) == -1) {
@@ -1354,12 +1548,13 @@ void *handle_loan_approval(void *arg) {
         close(client_sockfd);
         pthread_exit(NULL);
     }
-    printf("%s\n",customer_username);
 
-    // Step 3: Open loanApplications.txt to find the loan
+    // Step 3: Lock loanApplications.txt for reading and writing
+    pthread_rwlock_wrlock(&loanApplications_lock);
     FILE *loan_file = fopen("loanApplications.txt", "rb+");
     if (!loan_file) {
         perror("File open error");
+        pthread_rwlock_unlock(&loanApplications_lock); // Unlock before exiting
         close(client_sockfd);
         pthread_exit(NULL);
     }
@@ -1369,7 +1564,6 @@ void *handle_loan_approval(void *arg) {
 
     // Step 4: Find the loan for the customer
     while (fread(&loan_app, sizeof(struct LoanApplication), 1, loan_file) == 1) {
-        printf("%s\n",loan_app.username);
         if (strcmp(loan_app.username, customer_username) == 0) {
             loan_found = 1;
             break;
@@ -1379,6 +1573,7 @@ void *handle_loan_approval(void *arg) {
     if (!loan_found) {
         printf("Loan for customer %s not found.\n", customer_username);
         fclose(loan_file);
+        pthread_rwlock_unlock(&loanApplications_lock); // Unlock before exiting
         close(client_sockfd);
         pthread_exit(NULL);
     }
@@ -1391,6 +1586,7 @@ void *handle_loan_approval(void *arg) {
     if (send(client_sockfd, &loan_request_info, sizeof(loan_request_info), 0) == -1) {
         perror("send error");
         fclose(loan_file);
+        pthread_rwlock_unlock(&loanApplications_lock); // Unlock before exiting
         close(client_sockfd);
         pthread_exit(NULL);
     }
@@ -1400,6 +1596,7 @@ void *handle_loan_approval(void *arg) {
     if (recv(client_sockfd, response, sizeof(response), 0) <= 0) {
         perror("recv error");
         fclose(loan_file);
+        pthread_rwlock_unlock(&loanApplications_lock); // Unlock before exiting
         close(client_sockfd);
         pthread_exit(NULL);
     }
@@ -1408,18 +1605,19 @@ void *handle_loan_approval(void *arg) {
     if (strcmp(response, "reject") == 0) {
         // Delete the loan application record (optional)
     } else if (strcmp(response, "approve") == 0) {
-        // Step 8: Update the customer's balance directly in customers.txt
+        // Step 8: Lock customers.txt for reading and writing
+        pthread_rwlock_wrlock(&customers_lock);
         FILE *customer_file = fopen("customers.txt", "rb+");
         if (!customer_file) {
             perror("File open error");
             fclose(loan_file);
+            pthread_rwlock_unlock(&loanApplications_lock); // Unlock loan applications lock
             close(client_sockfd);
             pthread_exit(NULL);
         }
 
         struct Customer customer;
         int customer_found = 0;
-
 
         // Find the customer and update balance
         while (fread(&customer, sizeof(struct Customer), 1, customer_file) == 1) {
@@ -1438,49 +1636,55 @@ void *handle_loan_approval(void *arg) {
         }
 
         fclose(customer_file);
+        pthread_rwlock_unlock(&customers_lock); // Unlock customers lock
 
         // Step 9: Update passbook for the customer
+        pthread_rwlock_wrlock(&transactions_lock);
         FILE *transaction_file = fopen("transactions.txt", "r+b");
         if (transaction_file == NULL) {
             perror("File open error for transactions.txt");
             fclose(loan_file);
+            pthread_rwlock_unlock(&loanApplications_lock); // Unlock loan applications lock
+            close(client_sockfd);
             pthread_exit(NULL);
         }
 
         struct Passbook passbook;
         int passbook_found = 0;
 
-
         while (fread(&passbook, sizeof(struct Passbook), 1, transaction_file) == 1) {
-                if (strcmp(passbook.username, customer_username) == 0) {
-                    passbook_found = 1;
+            if (strcmp(passbook.username, customer_username) == 0) {
+                passbook_found = 1;
 
-                    // Create the deposit transaction
-                    struct Transaction deposit_transaction;
-                    strcpy(deposit_transaction.type, "Loan Deposit");
-                    deposit_transaction.amount = loan_app.amount;
-                    strcpy(deposit_transaction.date, "2024-10-19"); // Set the actual date
-                    strcpy(deposit_transaction.from_username, "CashFlow");
-                    strcpy(deposit_transaction.to_username, customer_username);
+                // Create the deposit transaction
+                struct Transaction deposit_transaction;
+                strcpy(deposit_transaction.type, "Loan Deposit");
+                deposit_transaction.amount = loan_app.amount;
+                strcpy(deposit_transaction.date, "2024-10-19"); // Set the actual date
+                strcpy(deposit_transaction.from_username, "CashFlow");
+                strcpy(deposit_transaction.to_username, customer_username);
 
-                    // Add the deposit transaction to the passbook
-                    passbook.transactions[passbook.num_transactions++] = deposit_transaction;
+                // Add the deposit transaction to the passbook
+                passbook.transactions[passbook.num_transactions++] = deposit_transaction;
 
-                    // Seek back and update the passbook record
-                    fseek(transaction_file, -sizeof(struct Passbook), SEEK_CUR);
-                    fwrite(&passbook, sizeof(struct Passbook), 1, transaction_file);
-                    break;
-                }
+                // Seek back and update the passbook record
+                fseek(transaction_file, -sizeof(struct Passbook), SEEK_CUR);
+                fwrite(&passbook, sizeof(struct Passbook), 1, transaction_file);
+                break;
             }
-
-            fclose(transaction_file);
         }
 
+        fclose(transaction_file);
+        pthread_rwlock_unlock(&transactions_lock); // Unlock transactions lock
+    }
+
     // Step 10: Update Employee structure
+    pthread_rwlock_wrlock(&employees_lock);
     FILE *employee_file = fopen("employees.txt", "rb+");
     if (!employee_file) {
         perror("File open error for employees.txt");
         fclose(loan_file);
+        pthread_rwlock_unlock(&loanApplications_lock); // Unlock loan applications lock
         close(client_sockfd);
         pthread_exit(NULL);
     }
@@ -1517,12 +1721,14 @@ void *handle_loan_approval(void *arg) {
     }
 
     fclose(employee_file);
+    pthread_rwlock_unlock(&employees_lock); // Unlock employees lock
 
     // Step 11: Delete the loan application record
     FILE *temp_file = fopen("temp_loanApplications.txt", "wb");
     if (!temp_file) {
         perror("File open error");
         fclose(loan_file);
+        pthread_rwlock_unlock(&loanApplications_lock); // Unlock loan applications lock
         close(client_sockfd);
         pthread_exit(NULL);
     }
@@ -1546,6 +1752,59 @@ void *handle_loan_approval(void *arg) {
     close(client_sockfd);
     pthread_exit(NULL);
 }
+
+void *getFeedback(void *arg) {
+    struct FeedbackQuery *query = (struct FeedbackQuery *)arg;
+    int client_sockfd = query->client_sockfd;
+    char *username = query->username;
+    printf("Getting feedback for user: %s\n", username);
+
+    // Lock feedbacks.txt for reading (assuming you have a read lock implemented)
+    pthread_rwlock_rdlock(&feedbacks_lock);
+
+    FILE *file = fopen("feedbacks.txt", "rb");
+    if (file == NULL) {
+        perror("fopen");
+        pthread_rwlock_unlock(&feedbacks_lock); // Unlock before exiting
+        pthread_exit(NULL);
+    }
+
+    struct Feedback feedback;
+    int found = 0;
+
+    // Iterate through the feedback entries in the file
+    while (fread(&feedback, sizeof(struct Feedback), 1, file) == 1) {
+        trim_whitespace(feedback.username); // Trim the feedback username
+        printf("Feedback username: '%s'\n", feedback.username);
+        
+        trim_whitespace(username); // Trim the input username
+        if (strcmp(feedback.username, username) == 0) {
+            found = 1;
+
+            // Send the feedback structure to the client
+            ssize_t num_bytes_sent = send(client_sockfd, &feedback, sizeof(feedback), 0);
+            if (num_bytes_sent == -1) {
+                perror("send");
+            }
+            break;
+        }
+    }
+
+    fclose(file);
+    pthread_rwlock_unlock(&feedbacks_lock); // Unlock after processing the feedback file
+
+    // If feedback not found, send an empty feedback structure
+    if (!found) {
+        struct Feedback empty_feedback = {"", "No feedback found for this user."};
+        send(client_sockfd, &empty_feedback, sizeof(empty_feedback), 0);
+    }
+
+    // Close the socket if no longer needed
+    close(client_sockfd);
+    pthread_exit(NULL);
+}
+
+
 
 
 
@@ -1798,6 +2057,21 @@ else if (strcmp(operation.operation, "getEmployeeLoans") == 0) {
 
         // Create a new thread to handle fetching the passbook
         pthread_create(&thread_id, NULL, getpassbook, passbook_request);
+    } else if (strcmp(operation.operation, "viewFeedback") == 0) {
+        struct FeedbackQuery *feedback_query = malloc(sizeof(struct FeedbackQuery));
+        if (feedback_query == NULL) {
+            perror("malloc");
+            close(client_sockfd);
+            pthread_exit(NULL);
+        }
+
+        // Copy the username and socket descriptor to the feedback query structure
+        strncpy(feedback_query->username, operation.data.customer.username, sizeof(feedback_query->username) - 1);
+        feedback_query->username[sizeof(feedback_query->username) - 1] = '\0'; // Null-terminate
+        feedback_query->client_sockfd = client_sockfd;
+
+        // Create a new thread to handle fetching the feedback
+        pthread_create(&thread_id, NULL, getFeedback, feedback_query);
     } else {
         close(client_sockfd);
         pthread_exit(NULL);

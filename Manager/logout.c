@@ -7,6 +7,7 @@
 #include <sodium.h> // Include libsodium header
 #include "../global.c"
 
+
 struct ManagerLogin {
     char username[20];
     char loggedin[2]; // Should hold 'y' or 'n' and null terminator
@@ -21,7 +22,7 @@ void remove_newline(char *str) {
 }
 
 int main(int argc, char* argv[]) {
-    char ExitPath[256];
+     char ExitPath[256];
     snprintf(ExitPath, sizeof(ExitPath), "%s%s", basePath, "/welcome.out");
     // Initialize libsodium (if needed)
     if (sodium_init() < 0) {
@@ -78,7 +79,7 @@ int main(int argc, char* argv[]) {
     close(fd); // Close write descriptor
 
     printf("User logged out successfully.\n");
-    execl(ExitPath, ExitPath, (char *)NULL);
+    execvp(ExitPath, NULL);
 
     return 0; // Exit successfully
 }

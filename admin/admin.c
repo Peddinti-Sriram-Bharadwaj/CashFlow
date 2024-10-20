@@ -10,6 +10,8 @@
 int main(int argc, char *argv[]) {
 
     char *username = argv[0]; // Correctly retrieve the username
+    char AdminActionsPath[256];
+    snprintf(AdminActionsPath, sizeof(AdminActionsPath), "%s%s", basePath, "/admin/admin.out");
     char ExitPath[256];
     snprintf(ExitPath, sizeof(ExitPath), "%s%s", basePath, "/welcome.out");
     
@@ -58,9 +60,13 @@ int main(int argc, char *argv[]) {
             break;
         case 3:
             write(STDOUT_FILENO, "Modify customer details\n", 24);
+            printf("This feature is not yet implemented\n");
+            execvp(AdminActionsPath, argv);
             break;
         case 4:
             write(STDOUT_FILENO, "Manage user roles\n", 18);
+            printf("This feature is not yet implemented\n");
+            execvp(AdminActionsPath, argv);
             break;
         case 5:
             write(STDOUT_FILENO, "Change password\n", 16);
