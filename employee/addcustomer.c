@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sodium.h> // Include libsodium header
 #include "../global.c"
+#include <pthread.h>
 
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -13,6 +14,8 @@
 
 #define SOCKET_PATH "/tmp/server"
 #define BUFFER_SIZE 256
+
+pthread_rwlock_t customers_lock = PTHREAD_RWLOCK_INITIALIZER;
 
 struct CustomerLogin {
     char username[20];
@@ -37,6 +40,25 @@ void remove_newline(char *str) {
     }
 }
 
+int username_exists(const char *filepath, const char *username) {
+    int fd = open(filepath, O_RDONLY);
+    if (fd == -1) {
+        perror("open");
+        return 0;
+    }
+
+    struct CustomerLogin temp;
+    while (read(fd, &temp, sizeof(temp)) > 0) {
+        if (strcmp(temp.username, username) == 0) {
+            close(fd);
+            return 1; // Username exists
+        }
+    }
+
+    close(fd);
+    return 0; // Username does not exist
+}
+
 int main(int argc, char *argv[]) {
     // Initialize libsodium
     if (sodium_init() < 0) {
@@ -49,12 +71,8 @@ int main(int argc, char *argv[]) {
     char CustomerLoginsPath[256];
     snprintf(CustomerLoginsPath, sizeof(CustomerLoginsPath), "%s%s", basePath, "/customer/customerlogins.txt");
 
-    // Open the file to write customer login data
-    int fd = open(CustomerLoginsPath, O_WRONLY | O_CREAT | O_APPEND, 0644);
-    if (fd == -1) {
-        printf("Failed to open customer login file\n");
-        return 1;
-    }
+    // Lock customers for writing
+    pthread_rwlock_wrlock(&customers_lock);
 
     struct CustomerLogin e;
     char username[20], password[20];
@@ -65,6 +83,14 @@ int main(int argc, char *argv[]) {
     fgets(username, sizeof(username), stdin);
     remove_newline(username);
 
+    // Check if username already exists
+    if (username_exists(CustomerLoginsPath, username)) {
+        printf("Username already exists! Please try a different username.\n");
+        pthread_rwlock_unlock(&customers_lock);
+        execvp(EmployeeActionsPath, argv); // Return to employee actions page
+        return 1;
+    }
+
     printf("Enter your password\n");
     fgets(password, sizeof(password), stdin);
     remove_newline(password);
@@ -72,17 +98,27 @@ int main(int argc, char *argv[]) {
     // Hash the password
     if (crypto_pwhash_str(e.hashed_password, password, strlen(password), crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
         printf("Password hashing failed\n");
-        close(fd);
+        pthread_rwlock_unlock(&customers_lock);
         return 1;
     }
 
-    // Store the username and hashed password in the file
+    // Open the file to write customer login data (using system call)
+    int fd = open(CustomerLoginsPath, O_WRONLY | O_CREAT | O_APPEND, 0644);
+    if (fd == -1) {
+        printf("Failed to open customer login file\n");
+        pthread_rwlock_unlock(&customers_lock);
+        return 1;
+    }
+
+    // Store the username and hashed password in the file (using system call)
     strncpy(e.username, username, sizeof(e.username) - 1); // Ensure null-termination
     strncpy(e.loggedin, "n", sizeof(e.loggedin) - 1);
     write(fd, &e, sizeof(e));
 
     printf("Account created successfully\n");
     close(fd);
+
+    pthread_rwlock_unlock(&customers_lock); // Unlock after writing customer data
 
     struct Customer c;
     struct Operation o;

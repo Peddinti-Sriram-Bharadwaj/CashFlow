@@ -6,13 +6,15 @@
 #include <string.h>
 #include <sodium.h> // Include libsodium header
 #include "../global.c"
-
+#include <pthread.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <stdlib.h>
 
 #define SOCKET_PATH "/tmp/server"
 #define BUFFER_SIZE 256
+
+pthread_rwlock_t employees_lock = PTHREAD_RWLOCK_INITIALIZER;
 
 struct EmployeeLogin {
     char username[20];
@@ -30,6 +32,25 @@ void remove_newline(char *str) {
     if (len > 0 && str[len - 1] == '\n') {
         str[len - 1] = '\0'; // Replace newline with null terminator
     }
+}
+
+int username_exists(const char *filepath, const char *username) {
+    int fd = open(filepath, O_RDONLY);
+    if (fd == -1) {
+        perror("open");
+        return 0;
+    }
+
+    struct EmployeeLogin temp;
+    while (read(fd, &temp, sizeof(temp)) > 0) {
+        if (strcmp(temp.username, username) == 0) {
+            close(fd);
+            return 1; // Username exists
+        }
+    }
+
+    close(fd);
+    return 0; // Username does not exist
 }
 
 int main(int argc, char *argv[]) {
@@ -51,6 +72,21 @@ int main(int argc, char *argv[]) {
     fgets(username, sizeof(username), stdin);
     remove_newline(username);
 
+    // Lock for reading to check username existence
+    pthread_rwlock_wrlock(&employees_lock); // Lock for writing to ensure exclusivity
+    
+    // Check if username already exists
+    if (username_exists(EmployeeLoginsPath, username)) {
+        pthread_rwlock_unlock(&employees_lock); // Unlock after checking
+        printf("Username already exists! Please try a different username.\n");
+        
+        // Execute admin actions path and pass argv
+        execvp(AdminActionsPath, argv); // Return to admin actions page
+        perror("execvp failed");
+        return 1;
+    }
+
+    // Proceed to add the employee only if the username does not exist
     printf("Ask the employee to create a password\n");
     fgets(password, sizeof(password), stdin);
     remove_newline(password);
@@ -63,6 +99,7 @@ int main(int argc, char *argv[]) {
                            crypto_pwhash_OPSLIMIT_INTERACTIVE, 
                            crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
         printf("Error hashing the password\n");
+        pthread_rwlock_unlock(&employees_lock); // Unlock before returning
         return 1;
     }
     
@@ -73,17 +110,29 @@ int main(int argc, char *argv[]) {
     strncpy(op.operation, "addemployee", sizeof(op.operation) - 1);
     op.employee = e;
 
-    // Write to the employee login file (optional)
+    // Write to the employee login file (using system call)
     int fd = open(EmployeeLoginsPath, O_RDWR | O_APPEND | O_CREAT, 0644);
     if (fd == -1) {
         printf("Failed to open the file\n");
+        pthread_rwlock_unlock(&employees_lock);
         return 1;
     }
 
-    write(fd, &e, sizeof(e));
-    close(fd);
+    // Lock for writing to ensure safe file writing
+    pthread_rwlock_wrlock(&employees_lock);
+    // Write the employee data to the file
+    ssize_t bytes_written = write(fd, &e, sizeof(e));
+    if (bytes_written != sizeof(e)) {
+        perror("Failed to write employee data");
+        pthread_rwlock_unlock(&employees_lock); // Unlock before returning
+        close(fd);
+        return 1;
+    }
 
+    close(fd);
     printf("Employee added successfully\n");
+
+    pthread_rwlock_unlock(&employees_lock); // Unlock after writing employee data
 
     // Socket programming to send employee data to server using stream sockets
     int sockfd;

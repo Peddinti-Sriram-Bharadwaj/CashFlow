@@ -10,6 +10,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <stdlib.h>
+#include <errno.h>
 
 #define SOCKET_PATH "/tmp/server"
 #define BUFFER_SIZE 256
@@ -32,6 +33,58 @@ void remove_newline(char *str) {
     }
 }
 
+void lock_file(int fd, int lock_type) {
+    struct flock fl;
+    fl.l_type = lock_type; // Set the lock type (read or write)
+    fl.l_whence = SEEK_SET;
+    fl.l_start = 0; // Lock the whole file
+    fl.l_len = 0; // Lock all
+
+    // Attempt to acquire the lock; if blocked, wait
+    if (fcntl(fd, F_SETLKW, &fl) == -1) {
+        perror("Failed to lock the file");
+        exit(1);
+    }
+}
+
+void unlock_file(int fd) {
+    struct flock fl;
+    fl.l_type = F_UNLCK; // Unlock
+    fl.l_whence = SEEK_SET;
+    fl.l_start = 0; // Unlock the whole file
+    fl.l_len = 0; // Unlock all
+
+    if (fcntl(fd, F_SETLK, &fl) == -1) {
+        perror("Failed to unlock the file");
+        exit(1);
+    }
+}
+
+int username_exists(const char *username, const char *file_path) {
+    struct AdminLogin a;
+    int fd = open(file_path, O_RDONLY);
+    if (fd == -1) {
+        perror("Failed to open the file");
+        return 0; // Assume username does not exist
+    }
+
+    // Lock the file for reading
+    lock_file(fd, F_RDLCK); // Acquire a read lock
+
+    // Check if the username exists
+    while (read(fd, &a, sizeof(a)) > 0) {
+        if (strcmp(a.username, username) == 0) {
+            unlock_file(fd); // Unlock before returning
+            close(fd);
+            return 1; // Username exists
+        }
+    }
+
+    unlock_file(fd); // Unlock after checking
+    close(fd);
+    return 0; // Username does not exist
+}
+
 int main() {
     // Initialize libsodium
     if (sodium_init() < 0) {
@@ -44,6 +97,16 @@ int main() {
     char username[20], password[20];
     fgets(username, sizeof(username), stdin);
     remove_newline(username);
+
+    // Prepare the admin login file path
+    char AdminLoginsPath[256];
+    snprintf(AdminLoginsPath, sizeof(AdminLoginsPath), "%s%s", basePath, "/admin/adminlogins.txt");
+
+    // Check if the username already exists in the admin logins
+    if (username_exists(username, AdminLoginsPath)) {
+        printf("Username already exists! Please try a different username.\n");
+        return 1; // Return or execvp to the admin actions path
+    }
 
     printf("Ask the customer to create a password\n");
     fgets(password, sizeof(password), stdin);
@@ -67,21 +130,29 @@ int main() {
     strncpy(op.operation, "addadmin", sizeof(op.operation) - 1);
     op.admin = a;
 
-    // Write to the admin login file
-    char AdminLoginsPath[256];
-    snprintf(AdminLoginsPath, sizeof(AdminLoginsPath), "%s%s", basePath, "/admin/adminlogins.txt");
-
+    // Open the file for writing
     int fd = open(AdminLoginsPath, O_RDWR | O_APPEND | O_CREAT, 0644);
     if (fd == -1) {
         printf("Failed to open the file\n");
         return 1;
     }
 
+    // Lock the file for writing
+    lock_file(fd, F_WRLCK); // Acquire a write lock
+
     // Write the struct with username and hashed password to the file
-    write(fd, &a, sizeof(a));
-    close(fd);
+    if (write(fd, &a, sizeof(a)) == -1) {
+        perror("Failed to write to the file");
+        unlock_file(fd); // Unlock before returning
+        close(fd);
+        return 1;
+    }
 
     printf("Admin account created and data written to file\n");
+
+    // Unlock the record after writing
+    unlock_file(fd);
+    close(fd);
 
     // Socket programming to send admin data to server
     int sockfd;

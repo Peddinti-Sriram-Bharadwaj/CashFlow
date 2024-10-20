@@ -11,6 +11,14 @@
 #define SOCKET_PATH "/tmp/server"
 #define BUFFER_SIZE 256
 
+pthread_rwlock_t admins_lock = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t customers_lock = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t employees_lock = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t feedbacks_lock = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t loanApplications_lock = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t managers_lock = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t transactions_lock = PTHREAD_RWLOCK_INITIALIZER;
+
 
 struct Customer {
     char username[20];
@@ -136,30 +144,45 @@ struct LoanApprovalRequest {
 };
 
 
-// Function to handle adding a customer
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+
 void *addcustomer(void *arg) {
     struct Customer *customer = (struct Customer *)arg;
 
-    // Open the customers file for appending
-    FILE *customer_file = fopen("customers.txt", "ab");
-    if (customer_file == NULL) {
-        perror("fopen");
+    // Lock customers for writing
+    pthread_rwlock_wrlock(&customers_lock);
+
+    // Open the customers file for appending (using system call)
+    int customer_fd = open("customers.txt", O_WRONLY | O_APPEND | O_CREAT, 0644);
+    if (customer_fd == -1) {
+        perror("open");
+        pthread_rwlock_unlock(&customers_lock);
         pthread_exit(NULL);
     }
 
-    // Write the customer data to the file
-    if (fwrite(customer, sizeof(struct Customer), 1, customer_file) != 1) {
-        perror("fwrite");
-        fclose(customer_file);
+    // Write the customer data to the file (using system call)
+    if (write(customer_fd, customer, sizeof(struct Customer)) == -1) {
+        perror("write");
+        close(customer_fd);
+        pthread_rwlock_unlock(&customers_lock);
         pthread_exit(NULL);
     }
 
-    fclose(customer_file);
+    close(customer_fd);
 
-    // Now add the empty passbook to the transactions file
-    FILE *passbook_file = fopen("transactions.txt", "ab");
-    if (passbook_file == NULL) {
-        perror("fopen");
+    // Unlock customers after writing
+    pthread_rwlock_unlock(&customers_lock);
+
+    // Lock transactions for writing
+    pthread_rwlock_wrlock(&transactions_lock);
+
+    // Open the transactions file for appending (using system call)
+    int passbook_fd = open("transactions.txt", O_WRONLY | O_APPEND | O_CREAT, 0644);
+    if (passbook_fd == -1) {
+        perror("open");
+        pthread_rwlock_unlock(&transactions_lock);
         pthread_exit(NULL);
     }
 
@@ -168,18 +191,22 @@ void *addcustomer(void *arg) {
     strcpy(passbook.username, customer->username);  // Set the username from the customer struct
     passbook.num_transactions = 0;  // No transactions yet
 
-    // Write the empty passbook to the file
-    if (fwrite(&passbook, sizeof(struct Passbook), 1, passbook_file) != 1) {
-        perror("fwrite");
-        fclose(passbook_file);
+    // Write the empty passbook to the file (using system call)
+    if (write(passbook_fd, &passbook, sizeof(struct Passbook)) == -1) {
+        perror("write");
+        close(passbook_fd);
+        pthread_rwlock_unlock(&transactions_lock);
         pthread_exit(NULL);
     }
 
-    fclose(passbook_file);
+    close(passbook_fd);
 
+    // Unlock transactions after writing
+    pthread_rwlock_unlock(&transactions_lock);
 
     pthread_exit(NULL);
 }
+
 
 void *addadmin(void *arg) {
     struct Admin *admin = (struct Admin *)arg;
