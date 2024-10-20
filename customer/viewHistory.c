@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
             printf("  Type: %s\n", passbook.transactions[i].type);
             printf("  Amount: %d\n", passbook.transactions[i].amount);
             printf("  Date: %s\n", passbook.transactions[i].date);
-            if (strcmp(passbook.transactions[i].type, "Transfer In") == 0 || strcmp(passbook.transactions[i].type, "Transfer Out") == 0 ) {
+            if (strcmp(passbook.transactions[i].type, "Deposit") != 0 || strcmp(passbook.transactions[i].type, "Withdrawal") != 0) {
                 printf("  From: %s\n", passbook.transactions[i].from_username);
                 printf("  To: %s\n", passbook.transactions[i].to_username);
             }
