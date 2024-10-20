@@ -20,6 +20,22 @@ void remove_newline(char *str) {
     }
 }
 
+// Function to attempt to acquire the lock
+int acquire_lock(int fd, int type, off_t start, off_t len) {
+    struct flock lock;
+    memset(&lock, 0, sizeof(lock));
+    lock.l_type = type; // Lock type (shared or exclusive)
+    lock.l_whence = SEEK_SET;
+    lock.l_start = start; // Start of lock
+    lock.l_len = len; // Length of lock (0 for whole file)
+
+    while (fcntl(fd, F_SETLK, &lock) == -1) {
+        printf("Lock is currently unavailable. Please wait...\n");
+        sleep(1); // Wait for a second before retrying
+    }
+    return 0; // Return success
+}
+
 int main() {
     // Initialize libsodium
     if (sodium_init() < 0) {
@@ -32,10 +48,19 @@ int main() {
     char CustomerActionsPath[256];
     snprintf(CustomerActionsPath, sizeof(CustomerActionsPath), "%s%s", basePath, "/customer/customer.out");
 
-    int fd = open(CustomerLoginsPath, O_RDONLY);
+    char ExitPath[256];
+    snprintf(ExitPath, sizeof(ExitPath), "%s%s", basePath, "/welcome.out");
+
+    int fd = open(CustomerLoginsPath, O_RDWR); // Open for reading and writing
     if (fd < 0) {
         perror("Failed to open customer logins file");
-        return 1;
+        return 1; // Exit if open fails
+    }
+
+    // Attempt to acquire a write lock on the whole file
+    if (acquire_lock(fd, F_WRLCK, 0, 0) == -1) {
+        close(fd);
+        return 1; // Exit if lock acquisition fails
     }
 
     struct CustomerLogin e;
@@ -53,21 +78,39 @@ int main() {
     while (read(fd, &e, sizeof(e)) > 0) {
         if (strcmp(e.username, username) == 0) {
             found = 1;
-            break;
+            break; // Exit the loop if user is found
         }
         pos += sizeof(e); // Track the position of the current record
     }
 
+    // If user not found, unlock and execute exit path
     if (!found) {
         printf("User doesn't exist\n");
+        struct flock unlock;
+        memset(&unlock, 0, sizeof(unlock));
+        unlock.l_type = F_UNLCK; // Unlock the whole file
+        fcntl(fd, F_SETLK, &unlock);
         close(fd);
-        return 0;
+        
+        execvp(ExitPath, NULL); // Execute exit path
+        perror("Failed to execute exit path");
+        return 1; // Exit if exec fails
     }
 
+    // Check if the customer is already logged in
     if (strcmp(e.loggedin, "y") == 0) {
-        printf("User already logged in one session\n");
+        printf("User already logged in another session\n");
+        
+        // Unlock the whole file before executing exit path
+        struct flock unlock;
+        memset(&unlock, 0, sizeof(unlock));
+        unlock.l_type = F_UNLCK; // Unlock the whole file
+        fcntl(fd, F_SETLK, &unlock);
         close(fd);
-        return 0;
+        
+        execvp(ExitPath, NULL); // Execute exit path
+        perror("Failed to execute exit path");
+        return 1; // Exit if exec fails
     }
 
     printf("Enter your password\n");
@@ -77,45 +120,67 @@ int main() {
     // Verify the password
     if (crypto_pwhash_str_verify(e.hashed_password, password, strlen(password)) != 0) {
         printf("Invalid password\n");
+        
+        // Unlock the whole file before executing exit path
+        struct flock unlock;
+        memset(&unlock, 0, sizeof(unlock));
+        unlock.l_type = F_UNLCK; // Unlock the whole file
+        fcntl(fd, F_SETLK, &unlock);
         close(fd);
-        return 0;
+        
+        execvp(ExitPath, NULL); // Execute exit path
+        perror("Failed to execute exit path");
+        return 1; // Exit if exec fails
     } else {
         printf("Login successful\n");
-        e.loggedin[0] = 'y';
+        e.loggedin[0] = 'y'; // Update logged-in status
         e.loggedin[1] = '\0';
 
-        // Open file for reading and writing
-        int fd2 = open(CustomerLoginsPath, O_RDWR);
-        if (fd2 < 0) {
-            perror("Failed to open logins file for writing");
-            close(fd);
-            return 1;
-        }
-
         // Move the file pointer to the correct position to update the record
-        if (lseek(fd2, pos, SEEK_SET) == -1) {
-            perror("Failed to seek to the correct position");
-            close(fd2);
+        if (lseek(fd, pos, SEEK_SET) == (off_t)-1) {
+            perror("Failed to seek to user position");
+            struct flock unlock;
+            memset(&unlock, 0, sizeof(unlock));
+            unlock.l_type = F_UNLCK; // Unlock the whole file
+            fcntl(fd, F_SETLK, &unlock);
             close(fd);
-            return 1;
+            return 1; // Exit if seeking fails
         }
 
-        // Write the updated record
-        if (write(fd2, &e, sizeof(e)) != sizeof(e)) {
+        // Write the updated customer login struct
+        if (write(fd, &e, sizeof(e)) != sizeof(e)) {
             perror("Failed to write updated login status");
-            close(fd2);
+            struct flock unlock;
+            memset(&unlock, 0, sizeof(unlock));
+            unlock.l_type = F_UNLCK; // Unlock the whole file
+            fcntl(fd, F_SETLK, &unlock);
             close(fd);
-            return 1;
+            return 1; // Exit if write fails
         }
 
-        close(fd2);
-        close(fd);
+        printf("Updated login status for user: %s\n", e.username);
+
+        // Unlock the whole file before executing customer actions
+        struct flock unlock;
+        memset(&unlock, 0, sizeof(unlock));
+        unlock.l_type = F_UNLCK; // Unlock the whole file
+        fcntl(fd, F_SETLK, &unlock);
+        close(fd); // Close the file descriptor before executing customer actions
 
         // Execute customer actions
-        char* args[] = {e.username, NULL};
+        char *args[] = {e.username, NULL};
         execvp(CustomerActionsPath, args);
-        perror("execvp failed");
+        
+        // If execvp fails
+        perror("Failed to execute customer actions");
+        return 1; // Exit if execvp fails
     }
 
+    // This line may not be reached if execvp is successful
+    struct flock unlock;
+    memset(&unlock, 0, sizeof(unlock));
+    unlock.l_type = F_UNLCK; // Unlock the whole file
+    fcntl(fd, F_SETLK, &unlock);
+    close(fd);
     return 0;
 }

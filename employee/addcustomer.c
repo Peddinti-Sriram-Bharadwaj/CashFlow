@@ -6,16 +6,12 @@
 #include <string.h>
 #include <sodium.h> // Include libsodium header
 #include "../global.c"
-#include <pthread.h>
-
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <stdlib.h>
 
 #define SOCKET_PATH "/tmp/server"
 #define BUFFER_SIZE 256
-
-pthread_rwlock_t customers_lock = PTHREAD_RWLOCK_INITIALIZER;
 
 struct CustomerLogin {
     char username[20];
@@ -40,22 +36,15 @@ void remove_newline(char *str) {
     }
 }
 
-int username_exists(const char *filepath, const char *username) {
-    int fd = open(filepath, O_RDONLY);
-    if (fd == -1) {
-        perror("open");
-        return 0;
-    }
-
+int username_exists(int fd, const char *username) {
     struct CustomerLogin temp;
+
+    // Read existing usernames from the file
     while (read(fd, &temp, sizeof(temp)) > 0) {
         if (strcmp(temp.username, username) == 0) {
-            close(fd);
             return 1; // Username exists
         }
     }
-
-    close(fd);
     return 0; // Username does not exist
 }
 
@@ -71,8 +60,26 @@ int main(int argc, char *argv[]) {
     char CustomerLoginsPath[256];
     snprintf(CustomerLoginsPath, sizeof(CustomerLoginsPath), "%s%s", basePath, "/customer/customerlogins.txt");
 
-    // Lock customers for writing
-    pthread_rwlock_wrlock(&customers_lock);
+    // Open the file for reading and writing with a lock
+    int fd = open(CustomerLoginsPath, O_RDWR | O_APPEND | O_CREAT, 0644);
+    if (fd == -1) {
+        perror("Failed to open customer login file");
+        return 1;
+    }
+
+    struct flock lock;
+    lock.l_type = F_WRLCK;    // Exclusive lock
+    lock.l_whence = SEEK_SET;
+    lock.l_start = 0;
+    lock.l_len = 0;           // Lock the whole file
+
+    // Attempt to acquire the write lock
+    printf("Waiting to acquire the lock for writing...\n");
+    if (fcntl(fd, F_SETLKW, &lock) == -1) {
+        perror("fcntl");
+        close(fd);
+        return 1; // Lock acquisition failed
+    }
 
     struct CustomerLogin e;
     char username[20], password[20];
@@ -83,10 +90,12 @@ int main(int argc, char *argv[]) {
     fgets(username, sizeof(username), stdin);
     remove_newline(username);
 
-    // Check if username already exists
-    if (username_exists(CustomerLoginsPath, username)) {
+    // Check if the username already exists
+    if (username_exists(fd, username)) {
         printf("Username already exists! Please try a different username.\n");
-        pthread_rwlock_unlock(&customers_lock);
+        lock.l_type = F_UNLCK; // Unlock
+        fcntl(fd, F_SETLK, &lock);
+        close(fd);
         execvp(EmployeeActionsPath, argv); // Return to employee actions page
         return 1;
     }
@@ -98,34 +107,36 @@ int main(int argc, char *argv[]) {
     // Hash the password
     if (crypto_pwhash_str(e.hashed_password, password, strlen(password), crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
         printf("Password hashing failed\n");
-        pthread_rwlock_unlock(&customers_lock);
-        return 1;
+        lock.l_type = F_UNLCK; // Unlock
+        fcntl(fd, F_SETLK, &lock);
+        close(fd);
+        return 1; // Error occurred
     }
 
-    // Open the file to write customer login data (using system call)
-    int fd = open(CustomerLoginsPath, O_WRONLY | O_CREAT | O_APPEND, 0644);
-    if (fd == -1) {
-        printf("Failed to open customer login file\n");
-        pthread_rwlock_unlock(&customers_lock);
-        return 1;
-    }
-
-    // Store the username and hashed password in the file (using system call)
+    // Store the username and hashed password in the file
     strncpy(e.username, username, sizeof(e.username) - 1); // Ensure null-termination
     strncpy(e.loggedin, "n", sizeof(e.loggedin) - 1);
-    write(fd, &e, sizeof(e));
+    
+    if (write(fd, &e, sizeof(e)) == -1) {
+        perror("Failed to write customer login data");
+        lock.l_type = F_UNLCK; // Unlock
+        fcntl(fd, F_SETLK, &lock);
+        close(fd);
+        return 1; // Error occurred
+    }
 
     printf("Account created successfully\n");
     close(fd);
 
-    pthread_rwlock_unlock(&customers_lock); // Unlock after writing customer data
+    lock.l_type = F_UNLCK; // Unlock the file
+    fcntl(fd, F_SETLK, &lock);
 
     struct Customer c;
     struct Operation o;
     strncpy(c.username, username, sizeof(c.username) - 1);
+    c.balance = 0;
     strncpy(o.operation, "addcustomer", sizeof(o.operation) - 1);
     o.customer = c;
-    c.balance = 0;
 
     // Socket programming to send customer data to server
     int sockfd;
