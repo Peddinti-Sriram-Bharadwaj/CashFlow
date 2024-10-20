@@ -1,4 +1,4 @@
-all: login.out admin.out addAdmin.out addEmployee.out addManager.out logout.out
+all: login.out admin.out addAdmin.out addEmployee.out addManager.out logout.out changePassword.out
 
 login.out: login.c
 	gcc -o login.out login.c -I/opt/homebrew/Cellar/libsodium/1.0.20/include -L/opt/homebrew/Cellar/libsodium/1.0.20/lib -lsodium
@@ -20,3 +20,6 @@ addManager.out: addManager.c
 	
 logout.out: login.c
 	gcc -o logout.out logout.c -I/opt/homebrew/Cellar/libsodium/1.0.20/include -L/opt/homebrew/Cellar/libsodium/1.0.20/lib -lsodium
+
+changePassword.out: changePassword.c
+	gcc -o changePassword.out changePassword.c -I/opt/homebrew/Cellar/libsodium/1.0.20/include -L/opt/homebrew/Cellar/libsodium/1.0.20/lib -lsodium

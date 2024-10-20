@@ -23,6 +23,9 @@ int main(int argc, char* argv[]) {
   char assignLoanPath[256];
   snprintf(assignLoanPath, sizeof(assignLoanPath), "%s%s", basePath, "/Manager/assignLoan.out");
 
+  char changePasswordPath[256];
+  snprintf(changePasswordPath, sizeof(changePasswordPath), "%s%s", basePath, "/Manager/changePassword.out");
+
 
 
   char* username = argv[0];
@@ -63,6 +66,7 @@ int main(int argc, char* argv[]) {
       break;
     case 6:
       printf("change password\n");
+      execvp(changePasswordPath, argv);
       break;
     case 7:
       printf("Logout\n");

@@ -22,6 +22,9 @@ int main(int argc, char *argv[]) {
     char AddManagerPath[256];
     snprintf(AddManagerPath, sizeof(AddManagerPath), "%s%s", basePath, "/admin/addManager.out");
 
+    char changePasswordPath[256];
+    snprintf(changePasswordPath, sizeof(changePasswordPath), "%s%s", basePath, "/admin/changePassword.out");
+
 
     printf("Welcome to the admin dashboard\n");
     printf("Hello %s\n", username);
@@ -54,6 +57,7 @@ int main(int argc, char *argv[]) {
             break;
         case 5:
             printf("Change password\n");
+            execvp(changePasswordPath, argv);
             break;
         case 6:
             printf("Logout\n");

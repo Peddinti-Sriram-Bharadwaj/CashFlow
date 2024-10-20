@@ -1,4 +1,4 @@
-all: login.out manager.out logout.out viewLoans.out viewEmployees.out assignLoan.out
+all: login.out manager.out logout.out viewLoans.out viewEmployees.out assignLoan.out changePassword.out
 
 login.out: login.c
 	gcc -o login.out login.c -I/opt/homebrew/Cellar/libsodium/1.0.20/include -L/opt/homebrew/Cellar/libsodium/1.0.20/lib -lsodium
@@ -18,3 +18,6 @@ viewEmployees.out: viewEmployees.c
 
 assignLoan.out: assignLoan.c
 	gcc -o assignLoan.out assignLoan.c
+
+changePassword.out: changePassword.c
+	gcc -o changePassword.out changePassword.c -I/opt/homebrew/Cellar/libsodium/1.0.20/include -L/opt/homebrew/Cellar/libsodium/1.0.20/lib -lsodium
