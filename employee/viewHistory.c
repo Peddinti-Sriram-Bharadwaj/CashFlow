@@ -32,9 +32,44 @@ struct Passbook {
     struct Transaction transactions[100];  // Array to store the transactions
 };
 
+void write_string(int fd, const char *str) {
+    write(fd, str, strlen(str));
+}
+
+void read_string(int fd, char *buffer, size_t size) {
+    ssize_t bytes_read = read(fd, buffer, size - 1);
+    if (bytes_read > 0) {
+        buffer[bytes_read] = '\0';
+    }
+}
+
+ssize_t read_full(int sockfd, void *buf, size_t len) {
+    size_t total_bytes_read = 0;
+    ssize_t bytes_read;
+    char *buffer = (char *)buf;
+
+    while (total_bytes_read < len) {
+        bytes_read = read(sockfd, buffer + total_bytes_read, len - total_bytes_read);
+        if (bytes_read <= 0) {
+            break; // Error or end of data
+        }
+        total_bytes_read += bytes_read;
+    }
+    return total_bytes_read;
+}
+
+void remove_newline(char *str) {
+    size_t len = strlen(str);
+    if (len > 0 && str[len - 1] == '\n') {
+        str[len - 1] = '\0'; // Replace newline with null terminator
+    }
+}
+
 int main(int argc, char *argv[]) {
     if (argc < 1) {
-        fprintf(stderr, "Usage: %s <employee_username>\n", argv[0]);
+        write_string(STDERR_FILENO, "Usage: ");
+        write_string(STDERR_FILENO, argv[0]);
+        write_string(STDERR_FILENO, " <employee_username>\n");
         exit(1);
     }
 
@@ -42,13 +77,15 @@ int main(int argc, char *argv[]) {
     snprintf(EmployeeActionsPath, sizeof(EmployeeActionsPath), "%s%s", basePath, "/employee/employee.out");
     
     char *employee_username = argv[0];  // Use argv[0] as the employee username
-    printf("Employee: %s\n", employee_username);
-    fflush(stdout);  // Ensure output is printed immediately
+    write_string(STDOUT_FILENO, "Employee: ");
+    write_string(STDOUT_FILENO, employee_username);
+    write_string(STDOUT_FILENO, "\n");
 
     // Ask the user for the customer whose passbook they want to view
     char customer_username[20];
-    printf("Enter the username of the customer whose passbook you want to view: ");
-    scanf("%19s", customer_username);  // Take input for the customer username
+    write_string(STDOUT_FILENO, "Enter the username of the customer whose passbook you want to view: ");
+    read_string(STDIN_FILENO, customer_username, sizeof(customer_username));
+    remove_newline(customer_username);
 
     int sockfd;
     struct sockaddr_un server_addr;
@@ -86,35 +123,41 @@ int main(int argc, char *argv[]) {
 
     // Receive the passbook (transaction history) response from the server
     struct Passbook passbook;
-    num_bytes = recv(sockfd, &passbook, sizeof(passbook), 0);
-    if (num_bytes == -1) {
-        perror("recv");
+    num_bytes = read_full(sockfd, &passbook, sizeof(passbook)); // Use read_full to ensure full struct is read
+    if (num_bytes != sizeof(passbook)) {
+        write_string(STDOUT_FILENO, "Failed to read the complete passbook\n");
         close(sockfd);
         exit(1);
     }
 
     // Display the transaction history
     if (passbook.num_transactions == 0) {
-        printf("No transactions found for user %s.\n", customer_username);
+        write_string(STDOUT_FILENO, "No transactions found for user ");
+        write_string(STDOUT_FILENO, customer_username);
+        write_string(STDOUT_FILENO, ".\n");
     } else {
-        printf("Transaction History for user %s:\n", customer_username);
+        write_string(STDOUT_FILENO, "Transaction History for user ");
+        write_string(STDOUT_FILENO, customer_username);
+        write_string(STDOUT_FILENO, ":\n");
         for (int i = 0; i < passbook.num_transactions; i++) {
-            printf("Transaction %d:\n", i + 1);
-            printf("  Type: %s\n", passbook.transactions[i].type);
-            printf("  Amount: %d\n", passbook.transactions[i].amount);
-            printf("  Date: %s\n", passbook.transactions[i].date);
-            if (strcmp(passbook.transactions[i].type, "Deposit") == 0 || strcmp(passbook.transactions[i].type, "Withdrawal") == 0) {
-                printf("  From: %s\n", passbook.transactions[i].from_username);
-                printf("  To: %s\n", passbook.transactions[i].to_username);
+            char buffer[BUFFER_SIZE];
+            snprintf(buffer, sizeof(buffer), "Transaction %d:\n  Type: %s\n  Amount: %d\n  Date: %s\n", 
+                     i + 1, passbook.transactions[i].type, passbook.transactions[i].amount, passbook.transactions[i].date);
+            write_string(STDOUT_FILENO, buffer);
+            if (strcmp(passbook.transactions[i].type, "Transfer") == 0) {
+                snprintf(buffer, sizeof(buffer), "  From: %s\n  To: %s\n", 
+                         passbook.transactions[i].from_username, passbook.transactions[i].to_username);
+                write_string(STDOUT_FILENO, buffer);
             }
-            printf("\n");
+            write_string(STDOUT_FILENO, "\n");
         }
     }
 
     // Close the socket
     close(sockfd);
 
-    execvp(EmployeeActionsPath, argv);  // Return to the customer actions menu
+    // Return to the employee actions menu
+    execvp(EmployeeActionsPath, argv);
 
     return 0; // Exit successfully
 }

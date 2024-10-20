@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include "../global.c"
 
 #define SOCKET_PATH "/tmp/server"
@@ -22,6 +23,16 @@ struct LoanApplication {
     int amount;
     char assigned_employee[20]; // Initially set to "None"
 };
+
+void write_message(int fd, const char *message) {
+    write(fd, message, strlen(message));
+}
+
+void write_int(int fd, int value) {
+    char buffer[BUFFER_SIZE];
+    snprintf(buffer, sizeof(buffer), "%d\n", value);
+    write(fd, buffer, strlen(buffer));
+}
 
 int main(int argc, char *argv[]) {
     char ManagerActionsPath[256];
@@ -50,8 +61,6 @@ int main(int argc, char *argv[]) {
 
     // Prepare the operation to list pending applications
     strcpy(operation.operation, "pending");
-    // You can add additional data to the operation if needed
-    // For example, operation.data.username could be set if you wanted to filter by a specific user
 
     // Send the operation to the server
     ssize_t num_bytes = send(sockfd, &operation, sizeof(operation), 0);
@@ -63,30 +72,31 @@ int main(int argc, char *argv[]) {
 
     // Receive the number of pending applications
     int pending_count;
-    num_bytes = recv(sockfd, &pending_count, sizeof(pending_count), 0);
+    num_bytes = read(sockfd, &pending_count, sizeof(pending_count));
     if (num_bytes == -1) {
-        perror("recv");
+        perror("read");
         close(sockfd);
         exit(1);
     }
 
-    printf("Number of pending loan applications: %d\n", pending_count);
+    write_message(STDOUT_FILENO, "Number of pending loan applications: ");
+    write_int(STDOUT_FILENO, pending_count);
 
     // Step 4: Receive each pending loan application and display it
     for (int i = 0; i < pending_count; i++) {
         struct LoanApplication loan_application;
-        num_bytes = recv(sockfd, &loan_application, sizeof(struct LoanApplication), 0);
+        num_bytes = read(sockfd, &loan_application, sizeof(struct LoanApplication));
         if (num_bytes == -1) {
-            perror("recv");
+            perror("read");
             close(sockfd);
             exit(1);
         }
 
         // Display the loan application
-        printf("Application %d:\n", i + 1);
-        printf("  Username: %s\n", loan_application.username);
-        printf("  Amount: %d\n", loan_application.amount);
-        printf("  Assigned Employee: %s\n", loan_application.assigned_employee);
+        char buffer[BUFFER_SIZE];
+        snprintf(buffer, sizeof(buffer), "Application %d:\n  Username: %s\n  Amount: %d\n  Assigned Employee: %s\n", 
+                 i + 1, loan_application.username, loan_application.amount, loan_application.assigned_employee);
+        write(STDOUT_FILENO, buffer, strlen(buffer));
 
         // Send acknowledgment to the server
         int ack = 1; // Acknowledgment

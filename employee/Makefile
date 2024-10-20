@@ -10,7 +10,7 @@ addcustomer.out: addcustomer.c
 	gcc -o addcustomer.out addcustomer.c -I/opt/homebrew/Cellar/libsodium/1.0.20/include -L/opt/homebrew/Cellar/libsodium/1.0.20/lib -lsodium
 
 logout.out: logout.c
-	gcc -o logout.out logout.c -I/opt/homebrew/Cellar/libsodium/1.0.20/include -L/opt/homebrew/Cellar/libsodium/1.0.20/lib -libsodium
+	gcc -o logout.out logout.c -I/opt/homebrew/Cellar/libsodium/1.0.20/include -L/opt/homebrew/Cellar/libsodium/1.0.20/lib -lsodium
 
 viewHistory.out: viewHistory.c
 	gcc -o viewHistory.out viewHistory.c 

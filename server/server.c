@@ -943,6 +943,7 @@ void *getpassbook(void *arg) {
     struct PassbookRequest *request = (struct PassbookRequest *)arg;
     int client_sockfd = request->client_sockfd;
     char *username = request->username;
+    printf("username: %s\n", username);
 
 
     FILE *file = fopen("transactions.txt", "rb");
@@ -959,6 +960,7 @@ void *getpassbook(void *arg) {
         // Check if the username matches
         if (strcmp(passbook.username, username) == 0) {
             found = 1;
+            printf("Found passbook for user: %s\n", username);
 
             // Send the passbook structure to the client
             ssize_t num_bytes_sent = send(client_sockfd, &passbook, sizeof(passbook), 0);
@@ -1354,6 +1356,8 @@ void *handle_loan_approval(void *arg) {
     strncpy(employee_username, loan_request->employee_username, sizeof(employee_username) - 1);
     employee_username[sizeof(employee_username) - 1] = '\0'; // Ensure null-termination
     free(loan_request);
+    printf("%s\n",employee_username);
+
 
     // Step 1: Send request for customer username
     if (send(client_sockfd, "username", sizeof("username"), 0) == -1) {
@@ -1369,6 +1373,7 @@ void *handle_loan_approval(void *arg) {
         close(client_sockfd);
         pthread_exit(NULL);
     }
+    printf("%s\n",customer_username);
 
     // Step 3: Open loanApplications.txt to find the loan
     FILE *loan_file = fopen("loanApplications.txt", "rb+");
@@ -1383,6 +1388,7 @@ void *handle_loan_approval(void *arg) {
 
     // Step 4: Find the loan for the customer
     while (fread(&loan_app, sizeof(struct LoanApplication), 1, loan_file) == 1) {
+        printf("%s\n",loan_app.username);
         if (strcmp(loan_app.username, customer_username) == 0) {
             loan_found = 1;
             break;

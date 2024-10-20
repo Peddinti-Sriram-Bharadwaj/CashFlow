@@ -4,7 +4,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <errno.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include "../global.c"
 
 #define SOCKET_PATH "/tmp/server"
@@ -16,6 +18,22 @@ struct Operation {
         char username[20]; // For loan application (username)
     } data;
 };
+
+ssize_t safe_read(int fd, void *buf, size_t count) {
+    ssize_t result;
+    do {
+        result = read(fd, buf, count);
+    } while (result == -1 && errno == EINTR);
+    return result;
+}
+
+ssize_t safe_write(int fd, const void *buf, size_t count) {
+    ssize_t result;
+    do {
+        result = write(fd, buf, count);
+    } while (result == -1 && errno == EINTR);
+    return result;
+}
 
 int main(int argc, char *argv[]) {
     char ManagerActionsPath[256];
@@ -46,7 +64,7 @@ int main(int argc, char *argv[]) {
     strcpy(operation.operation, "assignLoan");
 
     // Send the operation to the server
-    ssize_t num_bytes = send(sockfd, &operation, sizeof(operation), 0);
+    ssize_t num_bytes = safe_write(sockfd, &operation, sizeof(operation));
     if (num_bytes == -1) {
         perror("send");
         close(sockfd);
@@ -55,7 +73,7 @@ int main(int argc, char *argv[]) {
 
     // Step 1: Wait for "applicant" keyword from server
     char buffer[BUFFER_SIZE];
-    num_bytes = recv(sockfd, buffer, sizeof(buffer), 0);
+    num_bytes = safe_read(sockfd, buffer, sizeof(buffer));
     if (num_bytes == -1) {
         perror("recv");
         close(sockfd);
@@ -64,12 +82,17 @@ int main(int argc, char *argv[]) {
 
     if (strcmp(buffer, "applicant") == 0) {
         // Ask the user to input loan applicant username
-        printf("Enter the loan applicant username: ");
-        fgets(operation.data.username, sizeof(operation.data.username), stdin);
+        safe_write(STDOUT_FILENO, "Enter the loan applicant username: ", 35);
+        num_bytes = safe_read(STDIN_FILENO, operation.data.username, sizeof(operation.data.username));
+        if (num_bytes == -1) {
+            perror("read applicant");
+            close(sockfd);
+            exit(1);
+        }
         operation.data.username[strcspn(operation.data.username, "\n")] = '\0'; // Remove newline
 
         // Send the loan applicant username to the server
-        num_bytes = send(sockfd, &operation.data.username, sizeof(operation.data.username), 0);
+        num_bytes = safe_write(sockfd, &operation.data.username, sizeof(operation.data.username));
         if (num_bytes == -1) {
             perror("send applicant");
             close(sockfd);
@@ -78,7 +101,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Step 2: Wait for "employee" keyword from server
-    num_bytes = recv(sockfd, buffer, sizeof(buffer), 0);
+    num_bytes = safe_read(sockfd, buffer, sizeof(buffer));
     if (num_bytes == -1) {
         perror("recv");
         close(sockfd);
@@ -87,12 +110,17 @@ int main(int argc, char *argv[]) {
 
     if (strcmp(buffer, "employee") == 0) {
         // Ask the user to input employee username
-        printf("Enter the employee username: ");
-        fgets(operation.data.username, sizeof(operation.data.username), stdin);
+        safe_write(STDOUT_FILENO, "Enter the employee username: ", 29);
+        num_bytes = safe_read(STDIN_FILENO, operation.data.username, sizeof(operation.data.username));
+        if (num_bytes == -1) {
+            perror("read employee");
+            close(sockfd);
+            exit(1);
+        }
         operation.data.username[strcspn(operation.data.username, "\n")] = '\0'; // Remove newline
 
         // Send the employee username to the server
-        num_bytes = send(sockfd, &operation.data.username, sizeof(operation.data.username), 0);
+        num_bytes = safe_write(sockfd, &operation.data.username, sizeof(operation.data.username));
         if (num_bytes == -1) {
             perror("send employee");
             close(sockfd);
@@ -102,7 +130,7 @@ int main(int argc, char *argv[]) {
 
     // Step 3: Receive the result of the loan assignment from the server
     char assignment_status[BUFFER_SIZE];
-    num_bytes = recv(sockfd, assignment_status, sizeof(assignment_status), 0);
+    num_bytes = safe_read(sockfd, assignment_status, sizeof(assignment_status));
     if (num_bytes == -1) {
         perror("recv");
         close(sockfd);
@@ -110,7 +138,9 @@ int main(int argc, char *argv[]) {
     }
 
     // Display the assignment result
-    printf("Assignment result: %s\n", assignment_status);
+    safe_write(STDOUT_FILENO, "Assignment result: ", 19);
+    safe_write(STDOUT_FILENO, assignment_status, num_bytes);
+    safe_write(STDOUT_FILENO, "\n", 1);
 
     // Close the socket and exit
     close(sockfd);

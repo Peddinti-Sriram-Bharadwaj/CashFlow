@@ -32,12 +32,17 @@ struct Passbook {
     struct Transaction transactions[100];  // Array to store the transactions
 };
 
+void write_message(const char *message) {
+    write(STDOUT_FILENO, message, strlen(message));
+}
+
 int main(int argc, char *argv[]) {
     char CustomerActionsPath[256];
     snprintf(CustomerActionsPath, sizeof(CustomerActionsPath), "%s%s", basePath, "/customer/customer.out");
     char *username = argv[0];  // Use argv[0] as the username
-    printf("This is the username: %s\n", username);
-    fflush(stdout);  // Ensure output is printed immediately
+    char message[BUFFER_SIZE];
+    snprintf(message, sizeof(message), "This is the username: %s\n", username);
+    write_message(message);
 
     int sockfd;
     struct sockaddr_un server_addr;
@@ -75,28 +80,36 @@ int main(int argc, char *argv[]) {
 
     // Receive the passbook (transaction history) response from the server
     struct Passbook passbook;
-    num_bytes = recv(sockfd, &passbook, sizeof(passbook), 0);
+    num_bytes = read(sockfd, &passbook, sizeof(passbook));
     if (num_bytes == -1) {
-        perror("recv");
+        perror("read");
         close(sockfd);
         exit(1);
     }
 
     // Display the transaction history
     if (passbook.num_transactions == 0) {
-        printf("No transactions found for user %s.\n", username);
+        snprintf(message, sizeof(message), "No transactions found for user %s.\n", username);
+        write_message(message);
     } else {
-        printf("Transaction History for user %s:\n", username);
+        snprintf(message, sizeof(message), "Transaction History for user %s:\n", username);
+        write_message(message);
         for (int i = 0; i < passbook.num_transactions; i++) {
-            printf("Transaction %d:\n", i + 1);
-            printf("  Type: %s\n", passbook.transactions[i].type);
-            printf("  Amount: %d\n", passbook.transactions[i].amount);
-            printf("  Date: %s\n", passbook.transactions[i].date);
+            snprintf(message, sizeof(message), "Transaction %d:\n", i + 1);
+            write_message(message);
+            snprintf(message, sizeof(message), "  Type: %s\n", passbook.transactions[i].type);
+            write_message(message);
+            snprintf(message, sizeof(message), "  Amount: %d\n", passbook.transactions[i].amount);
+            write_message(message);
+            snprintf(message, sizeof(message), "  Date: %s\n", passbook.transactions[i].date);
+            write_message(message);
             if (strcmp(passbook.transactions[i].type, "Deposit") != 0 || strcmp(passbook.transactions[i].type, "Withdrawal") != 0) {
-                printf("  From: %s\n", passbook.transactions[i].from_username);
-                printf("  To: %s\n", passbook.transactions[i].to_username);
+                snprintf(message, sizeof(message), "  From: %s\n", passbook.transactions[i].from_username);
+                write_message(message);
+                snprintf(message, sizeof(message), "  To: %s\n", passbook.transactions[i].to_username);
+                write_message(message);
             }
-            printf("\n");
+            write_message("\n");
         }
     }
 

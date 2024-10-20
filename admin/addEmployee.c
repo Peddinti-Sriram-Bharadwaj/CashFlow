@@ -101,7 +101,14 @@ int main(int argc, char *argv[]) {
     char username[20], password[20];
     printf("Please enter the name of the Employee to be added\n");
     printf("Enter the username\n");
-    fgets(username, sizeof(username), stdin);
+    if (read(STDIN_FILENO, username, sizeof(username)) == -1) {
+        perror("read");
+        lock.l_type = F_UNLCK; // Unlock
+        fcntl(fd, F_SETLK, &lock);
+        close(fd);
+        execvp(ExitPath, argv); // Go to ExitPath on error
+        return 1;
+    }
     remove_newline(username);
 
     // Check if the username exists
@@ -116,11 +123,18 @@ int main(int argc, char *argv[]) {
 
     // Ask the employee to create a password
     printf("Ask the employee to create a password\n");
-    fgets(password, sizeof(password), stdin);
+    if (read(STDIN_FILENO, password, sizeof(password)) == -1) {
+        perror("read");
+        lock.l_type = F_UNLCK; // Unlock
+        fcntl(fd, F_SETLK, &lock);
+        close(fd);
+        execvp(ExitPath, argv); // Go to ExitPath on error
+        return 1;
+    }
     remove_newline(password);
 
     struct EmployeeLogin e;
-    strcpy(e.username, username);
+    strncpy(e.username, username, sizeof(e.username) - 1);
 
     // Hash the password
     if (crypto_pwhash_str(e.hashed_password, password, strlen(password), 

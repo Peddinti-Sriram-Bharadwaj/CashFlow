@@ -89,13 +89,13 @@ int main(int argc, char *argv[]) {
         unlock.l_type = F_UNLCK; // Unlock the whole file
         fcntl(fd, F_SETLK, &unlock);
         close(fd);
-        execvp(ExitPath, NULL); // Execute exit path
+        execl(ExitPath, ExitPath, (char *)NULL); // Execute exit path
         perror("Failed to execute exit path");
         return 1; // Exit if exec fails
     }
 
     printf("Enter your old password\n");
-    fgets(old_password, sizeof(old_password), stdin);
+    read(STDIN_FILENO, old_password, sizeof(old_password));
     remove_newline(old_password);
 
     // Verify the old password
@@ -106,17 +106,17 @@ int main(int argc, char *argv[]) {
         unlock.l_type = F_UNLCK; // Unlock the whole file
         fcntl(fd, F_SETLK, &unlock);
         close(fd);
-        execvp(ExitPath, NULL); // Execute exit path
+        execl(ExitPath, ExitPath, (char *)NULL); // Execute exit path
         perror("Failed to execute exit path");
         return 1; // Exit if exec fails
     }
 
     printf("Enter your new password\n");
-    fgets(new_password, sizeof(new_password), stdin);
+    read(STDIN_FILENO, new_password, sizeof(new_password));
     remove_newline(new_password);
 
     printf("Re-enter your new password for confirmation\n");
-    fgets(confirm_password, sizeof(confirm_password), stdin);
+    read(STDIN_FILENO, confirm_password, sizeof(confirm_password));
     remove_newline(confirm_password);
 
     if (strcmp(new_password, confirm_password) != 0) {
@@ -126,7 +126,7 @@ int main(int argc, char *argv[]) {
         unlock.l_type = F_UNLCK; // Unlock the whole file
         fcntl(fd, F_SETLK, &unlock);
         close(fd);
-        execvp(ExitPath, NULL); // Execute exit path
+        execl(ExitPath, ExitPath, (char *)NULL); // Execute exit path
         perror("Failed to execute exit path");
         return 1; // Exit if exec fails
     }

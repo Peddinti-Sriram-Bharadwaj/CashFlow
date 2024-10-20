@@ -52,20 +52,20 @@ void add_manager(int fd, struct ManagerLogin *m) {
     if (bytes_written != sizeof(*m)) {
         perror("Failed to write manager data");
     } else {
-        printf("Manager added successfully\n");
+        write(STDOUT_FILENO, "Manager added successfully\n", 27);
     }
 }
 
 int main(int argc, char *argv[]) {
     char ManagerLoginsPath[256];
-    snprintf(ManagerLoginsPath, sizeof(ManagerLoginsPath), "%s%s", basePath, "/Manager/managerlogins.txt");
+    sprintf(ManagerLoginsPath, "%s%s", basePath, "/Manager/managerlogins.txt");
 
     char AdminActionsPath[256];
-    snprintf(AdminActionsPath, sizeof(AdminActionsPath), "%s%s", basePath, "/admin/admin.out");
+    sprintf(AdminActionsPath, "%s%s", basePath, "/admin/admin.out");
 
     // Initialize libsodium
     if (sodium_init() < 0) {
-        printf("libsodium initialization failed\n");
+        write(STDOUT_FILENO, "libsodium initialization failed\n", 32);
         execvp(AdminActionsPath, argv); // Redirect to admin actions on failure
         perror("execvp failed"); // Only reached if execvp fails
         return 1;
@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
     lock.l_len = 0;           // Lock the whole file
 
     // Attempt to acquire the write lock
-    printf("Waiting to acquire the lock for writing...\n");
+    write(STDOUT_FILENO, "Waiting to acquire the lock for writing...\n", 43);
     if (fcntl(fd, F_SETLKW, &lock) == -1) {
         perror("fcntl");
         close(fd);
@@ -96,14 +96,14 @@ int main(int argc, char *argv[]) {
 
     // Ask for username
     char username[20], password[20];
-    printf("Please enter the name of the Manager to be added\n");
-    printf("Enter the username\n");
-    fgets(username, sizeof(username), stdin);
+    write(STDOUT_FILENO, "Please enter the name of the Manager to be added\n", 50);
+    write(STDOUT_FILENO, "Enter the username\n", 19);
+    read(STDIN_FILENO, username, sizeof(username));
     remove_newline(username);
 
     // Check if the username exists
     if (username_exists(fd, username)) {
-        printf("Username already exists! Redirecting to admin actions...\n");
+        write(STDOUT_FILENO, "Username already exists! Redirecting to admin actions...\n", 58);
         lock.l_type = F_UNLCK; // Unlock
         fcntl(fd, F_SETLK, &lock);
         close(fd);
@@ -112,8 +112,8 @@ int main(int argc, char *argv[]) {
     }
 
     // Ask the manager to create a password
-    printf("Ask the Manager to create a password\n");
-    fgets(password, sizeof(password), stdin);
+    write(STDOUT_FILENO, "Ask the Manager to create a password\n", 37);
+    read(STDIN_FILENO, password, sizeof(password));
     remove_newline(password);
 
     struct ManagerLogin m;
@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
     if (crypto_pwhash_str(m.hashed_password, password, strlen(password), 
                            crypto_pwhash_OPSLIMIT_INTERACTIVE, 
                            crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
-        printf("Error hashing the password\n");
+        write(STDOUT_FILENO, "Error hashing the password\n", 27);
         lock.l_type = F_UNLCK; // Unlock in case of error
         fcntl(fd, F_SETLK, &lock);
         close(fd);

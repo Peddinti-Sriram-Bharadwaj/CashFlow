@@ -23,13 +23,21 @@ struct LoanApplication {
     char assigned_employee[20]; // Initially set to "None"
 };
 
+void write_message(int fd, const char *message) {
+    write(fd, message, strlen(message));
+}
+
+void write_int(int fd, int value) {
+    char buffer[20];
+    snprintf(buffer, sizeof(buffer), "%d", value);
+    write_message(fd, buffer);
+}
+
 int main(int argc, char *argv[]) {
     char EmployeeActionsPath[256];
     snprintf(EmployeeActionsPath, sizeof(EmployeeActionsPath), "%s%s", basePath, "/employee/employee.out");
 
     char* employee_username = argv[0];
-
-
 
     int sockfd;
     struct sockaddr_un server_addr;
@@ -66,29 +74,38 @@ int main(int argc, char *argv[]) {
 
     // Receive the number of loans assigned to the employee
     int loan_count;
-    num_bytes = recv(sockfd, &loan_count, sizeof(loan_count), 0);
+    num_bytes = read(sockfd, &loan_count, sizeof(loan_count));
     if (num_bytes == -1) {
-        perror("recv");
+        perror("read");
         close(sockfd);
         exit(1);
     }
 
-    printf("Number of loans assigned to %s: %d\n", employee_username, loan_count);
+    write_message(STDOUT_FILENO, "Number of loans assigned to ");
+    write_message(STDOUT_FILENO, employee_username);
+    write_message(STDOUT_FILENO, ": ");
+    write_int(STDOUT_FILENO, loan_count);
+    write_message(STDOUT_FILENO, "\n");
 
     // Step 4: Receive and display each loan's details
     for (int i = 0; i < loan_count; i++) {
         struct LoanApplication loan_application;
-        num_bytes = recv(sockfd, &loan_application, sizeof(struct LoanApplication), 0);
+        num_bytes = read(sockfd, &loan_application, sizeof(struct LoanApplication));
         if (num_bytes == -1) {
-            perror("recv");
+            perror("read");
             close(sockfd);
             exit(1);
         }
 
         // Display loan details
-        printf("Loan %d:\n", i + 1);
-        printf("  Username: %s\n", loan_application.username);
-        printf("  Amount: %d\n", loan_application.amount);
+        write_message(STDOUT_FILENO, "Loan ");
+        write_int(STDOUT_FILENO, i + 1);
+        write_message(STDOUT_FILENO, ":\n");
+        write_message(STDOUT_FILENO, "  Username: ");
+        write_message(STDOUT_FILENO, loan_application.username);
+        write_message(STDOUT_FILENO, "\n  Amount: ");
+        write_int(STDOUT_FILENO, loan_application.amount);
+        write_message(STDOUT_FILENO, "\n");
     }
 
     // Close the socket

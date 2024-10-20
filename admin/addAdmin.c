@@ -88,28 +88,31 @@ int username_exists(const char *username, const char *file_path) {
 int main() {
     // Initialize libsodium
     if (sodium_init() < 0) {
-        printf("libsodium initialization failed\n");
+        const char *msg = "libsodium initialization failed\n";
+        write(STDOUT_FILENO, msg, strlen(msg));
         return 1;
     }
 
-    printf("Please enter the name of the customer to be added\n");
-    printf("Enter the username\n");
+    const char *prompt1 = "Please enter the name of the customer to be added\nEnter the username\n";
+    write(STDOUT_FILENO, prompt1, strlen(prompt1));
     char username[20], password[20];
-    fgets(username, sizeof(username), stdin);
+    read(STDIN_FILENO, username, sizeof(username));
     remove_newline(username);
 
     // Prepare the admin login file path
     char AdminLoginsPath[256];
-    snprintf(AdminLoginsPath, sizeof(AdminLoginsPath), "%s%s", basePath, "/admin/adminlogins.txt");
+    sprintf(AdminLoginsPath, "%s%s", basePath, "/admin/adminlogins.txt");
 
     // Check if the username already exists in the admin logins
     if (username_exists(username, AdminLoginsPath)) {
-        printf("Username already exists! Please try a different username.\n");
+        const char *msg = "Username already exists! Please try a different username.\n";
+        write(STDOUT_FILENO, msg, strlen(msg));
         return 1; // Return or execvp to the admin actions path
     }
 
-    printf("Ask the customer to create a password\n");
-    fgets(password, sizeof(password), stdin);
+    const char *prompt2 = "Ask the customer to create a password\n";
+    write(STDOUT_FILENO, prompt2, strlen(prompt2));
+    read(STDIN_FILENO, password, sizeof(password));
     remove_newline(password);
 
     // Hash the password
@@ -117,7 +120,8 @@ int main() {
     if (crypto_pwhash_str(a.hashed_password, password, strlen(password), 
                            crypto_pwhash_OPSLIMIT_INTERACTIVE, 
                            crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
-        printf("Password hashing failed\n");
+        const char *msg = "Password hashing failed\n";
+        write(STDOUT_FILENO, msg, strlen(msg));
         return 1;
     }
 
@@ -133,7 +137,8 @@ int main() {
     // Open the file for writing
     int fd = open(AdminLoginsPath, O_RDWR | O_APPEND | O_CREAT, 0644);
     if (fd == -1) {
-        printf("Failed to open the file\n");
+        const char *msg = "Failed to open the file\n";
+        write(STDOUT_FILENO, msg, strlen(msg));
         return 1;
     }
 
@@ -148,7 +153,8 @@ int main() {
         return 1;
     }
 
-    printf("Admin account created and data written to file\n");
+    const char *msg = "Admin account created and data written to file\n";
+    write(STDOUT_FILENO, msg, strlen(msg));
 
     // Unlock the record after writing
     unlock_file(fd);
@@ -183,7 +189,8 @@ int main() {
         exit(1);
     }
 
-    printf("Admin data sent to server\n");
+    const char *msg2 = "Admin data sent to server\n";
+    write(STDOUT_FILENO, msg2, strlen(msg2));
 
     // Close the socket
     close(sockfd);

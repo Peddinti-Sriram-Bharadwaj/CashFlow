@@ -7,79 +7,91 @@
 #include <sodium.h> // Include libsodium header
 #include "../global.c"
 
-int main(int argc, char* argv[]) {
-  char ExitPath[256];
-    snprintf(ExitPath, sizeof(ExitPath), "%s%s", basePath, "/welcome.out");
+#define BUFFER_SIZE 256
 
-  char LogOutPath[256];
+void write_message(const char *message) {
+  write(STDOUT_FILENO, message, strlen(message));
+}
+
+int main(int argc, char* argv[]) {
+  char ExitPath[BUFFER_SIZE];
+  snprintf(ExitPath, sizeof(ExitPath), "%s%s", basePath, "/welcome.out");
+
+  char LogOutPath[BUFFER_SIZE];
   snprintf(LogOutPath, sizeof(LogOutPath), "%s%s", basePath, "/Manager/logout.out");
 
-  char viewLoansPath[256];
+  char viewLoansPath[BUFFER_SIZE];
   snprintf(viewLoansPath, sizeof(viewLoansPath), "%s%s", basePath, "/Manager/viewLoans.out");
 
-  char viewEmployeesPath[256];
+  char viewEmployeesPath[BUFFER_SIZE];
   snprintf(viewEmployeesPath, sizeof(viewEmployeesPath), "%s%s", basePath, "/Manager/viewEmployees.out");
 
-  char assignLoanPath[256];
+  char assignLoanPath[BUFFER_SIZE];
   snprintf(assignLoanPath, sizeof(assignLoanPath), "%s%s", basePath, "/Manager/assignLoan.out");
 
-  char changePasswordPath[256];
+  char changePasswordPath[BUFFER_SIZE];
   snprintf(changePasswordPath, sizeof(changePasswordPath), "%s%s", basePath, "/Manager/changePassword.out");
 
-
-
   char* username = argv[0];
-  
-  printf("Welcome to the admin dashboard\n");
-  printf("Hello %s\n", username);
-  printf("Please choose one of the below to proceed further\n");
-  printf("Activate/deactivate customer accounts -1\n");
-  printf("View Pending loan applications -2\n");
-  printf("View employees available for loan application processing -3\n");
-  printf("Assign loan application processes to employees -4\n");
-  printf("Review customer feedback -5\n");
-  printf("Change password -6\n");
-  printf("Logout -7\n");
-  printf("Exit -8\n");
 
+  write_message("Welcome to the admin dashboard\n");
+  write_message("Hello ");
+  write_message(username);
+  write_message("\nPlease choose one of the below to proceed further\n");
+  write_message("Activate/deactivate customer accounts -1\n");
+  write_message("View Pending loan applications -2\n");
+  write_message("View employees available for loan application processing -3\n");
+  write_message("Assign loan application processes to employees -4\n");
+  write_message("Review customer feedback -5\n");
+  write_message("Change password -6\n");
+  write_message("Logout -7\n");
+  write_message("Exit -8\n");
+
+  char buffer[BUFFER_SIZE];
   int option;
-  scanf("%d", &option);
-  
-  switch(option){
+  ssize_t bytesRead = read(STDIN_FILENO, buffer, BUFFER_SIZE);
+  if (bytesRead > 0) {
+    buffer[bytesRead - 1] = '\0'; // Null-terminate the input
+    option = atoi(buffer);
+  } else {
+    write_message("Failed to read input\n");
+    return 1;
+  }
+
+  switch(option) {
     case 1: 
-      printf("activate/deactivate customer accounts\n");
+      write_message("activate/deactivate customer accounts\n");
       break;
     case 2:
-      printf("view pending loan applications\n");
+      write_message("view pending loan applications\n");
       execvp(viewLoansPath, argv);
       break;
     case 3:
-      printf("view employees available for loan application processing\n");
+      write_message("view employees available for loan application processing\n");
       execvp(viewEmployeesPath, argv);
       break;
     case 4:
-      printf("assign loan application\n");
+      write_message("assign loan application\n");
       execvp(assignLoanPath, argv);
       break;
     case 5:
-      printf("review customer feedback\n");
+      write_message("review customer feedback\n");
       break;
     case 6:
-      printf("change password\n");
+      write_message("change password\n");
       execvp(changePasswordPath, argv);
       break;
     case 7:
-      printf("Logout\n");
+      write_message("Logout\n");
       execvp(LogOutPath, argv);
       break;
     case 8:
-      printf("Exit\n");
+      write_message("Exit\n");
       execvp(ExitPath, NULL);
       break;
     default:
-      printf("invalid option\n");
+      write_message("invalid option\n");
       break;
   }
   return 0;
-
 }

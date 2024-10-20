@@ -14,14 +14,18 @@ struct Operation {
     char username[20];   // Username of the customer
 };
 
+void write_message(const char *message) {
+    write(STDOUT_FILENO, message, strlen(message));
+}
+
 int main(int argc, char *argv[]) {
     char CustomerActionsPath[256];
     snprintf(CustomerActionsPath, sizeof(CustomerActionsPath), "%s%s", basePath, "/customer/customer.out");
 
-
     char *username = argv[0]; // Use the second argument as the username
-    printf("This is the username: %s\n", username);
-    fflush(stdout); // Ensure output is printed immediately
+    write_message("This is the username: ");
+    write(STDOUT_FILENO, username, strlen(username));
+    write_message("\n");
 
     int sockfd;
     struct sockaddr_un server_addr;
@@ -57,22 +61,26 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    printf("Waiting for balance response...\n");
+    write_message("Waiting for balance response...\n");
 
     // Receive the response from the server (balance or error)
     int balance;
-    num_bytes = recv(sockfd, &balance, sizeof(balance), 0);
+    num_bytes = read(sockfd, &balance, sizeof(balance));
     if (num_bytes == -1) {
-        perror("recv");
+        perror("read");
         close(sockfd);
         exit(1);
     }
 
     // Process the balance or user not found error
     if (balance == -1) {
-        printf("User %s not found.\n", username);
+        write_message("User ");
+        write(STDOUT_FILENO, username, strlen(username));
+        write_message(" not found.\n");
     } else {
-        printf("Balance for user %s: %d\n", username, balance);
+        char buffer[256];
+        snprintf(buffer, sizeof(buffer), "Balance for user %s: %d\n", username, balance);
+        write_message(buffer);
     }
 
     // Close the socket

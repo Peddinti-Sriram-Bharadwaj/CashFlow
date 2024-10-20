@@ -30,7 +30,7 @@ int acquire_lock(int fd, int type, off_t start, off_t len) {
     lock.l_len = len; // Length of lock (0 for whole file)
 
     while (fcntl(fd, F_SETLK, &lock) == -1) {
-        printf("Lock is currently unavailable. Please wait...\n");
+        write(STDOUT_FILENO, "Lock is currently unavailable. Please wait...\n", 47);
         sleep(1); // Wait for a second before retrying
     }
     return 0; // Return success
@@ -67,10 +67,12 @@ int main(int argc, char *argv[]) {
     int found = 0;
     char old_password[20], new_password[20], confirm_password[20];
 
-    printf("Welcome to the admin dashboard\n");
-    printf("Please login below to proceed further\n");
+    write(STDOUT_FILENO, "Welcome to the admin dashboard\n", 31);
+    write(STDOUT_FILENO, "Please login below to proceed further\n", 39);
     char *username = argv[0];
-    printf("Hello %s\n", username);
+    write(STDOUT_FILENO, "Hello ", 6);
+    write(STDOUT_FILENO, username, strlen(username));
+    write(STDOUT_FILENO, "\n", 1);
 
     // Search for the user in the file
     off_t pos = 0;
@@ -83,50 +85,50 @@ int main(int argc, char *argv[]) {
     }
 
     if (!found) {
-        printf("User doesn't exist\n");
+        write(STDOUT_FILENO, "User doesn't exist\n", 19);
         struct flock unlock;
         memset(&unlock, 0, sizeof(unlock));
         unlock.l_type = F_UNLCK; // Unlock the whole file
         fcntl(fd, F_SETLK, &unlock);
         close(fd);
-        execvp(ExitPath, NULL); // Execute exit path
+        execl(ExitPath, ExitPath, (char *)NULL); // Execute exit path
         perror("Failed to execute exit path");
         return 1; // Exit if exec fails
     }
 
-    printf("Enter your old password\n");
-    fgets(old_password, sizeof(old_password), stdin);
+    write(STDOUT_FILENO, "Enter your old password\n", 24);
+    read(STDIN_FILENO, old_password, sizeof(old_password));
     remove_newline(old_password);
 
     // Verify the old password
     if (crypto_pwhash_str_verify(a.hashed_password, old_password, strlen(old_password)) != 0) {
-        printf("Invalid old password\n");
+        write(STDOUT_FILENO, "Invalid old password\n", 21);
         struct flock unlock;
         memset(&unlock, 0, sizeof(unlock));
         unlock.l_type = F_UNLCK; // Unlock the whole file
         fcntl(fd, F_SETLK, &unlock);
         close(fd);
-        execvp(ExitPath, NULL); // Execute exit path
+        execl(ExitPath, ExitPath, (char *)NULL); // Execute exit path
         perror("Failed to execute exit path");
         return 1; // Exit if exec fails
     }
 
-    printf("Enter your new password\n");
-    fgets(new_password, sizeof(new_password), stdin);
+    write(STDOUT_FILENO, "Enter your new password\n", 24);
+    read(STDIN_FILENO, new_password, sizeof(new_password));
     remove_newline(new_password);
 
-    printf("Re-enter your new password for confirmation\n");
-    fgets(confirm_password, sizeof(confirm_password), stdin);
+    write(STDOUT_FILENO, "Re-enter your new password for confirmation\n", 45);
+    read(STDIN_FILENO, confirm_password, sizeof(confirm_password));
     remove_newline(confirm_password);
 
     if (strcmp(new_password, confirm_password) != 0) {
-        printf("Passwords do not match. Try again.\n");
+        write(STDOUT_FILENO, "Passwords do not match. Try again.\n", 35);
         struct flock unlock;
         memset(&unlock, 0, sizeof(unlock));
         unlock.l_type = F_UNLCK; // Unlock the whole file
         fcntl(fd, F_SETLK, &unlock);
         close(fd);
-        execvp(ExitPath, NULL); // Execute exit path
+        execl(ExitPath, ExitPath, (char *)NULL); // Execute exit path
         perror("Failed to execute exit path");
         return 1; // Exit if exec fails
     }
@@ -135,7 +137,7 @@ int main(int argc, char *argv[]) {
     char hashed_new_password[crypto_pwhash_STRBYTES];
     if (crypto_pwhash_str(hashed_new_password, new_password, strlen(new_password), 
                            crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
-        printf("Password hashing failed\n");
+        write(STDOUT_FILENO, "Password hashing failed\n", 24);
         struct flock unlock;
         memset(&unlock, 0, sizeof(unlock));
         unlock.l_type = F_UNLCK; // Unlock the whole file
@@ -169,7 +171,7 @@ int main(int argc, char *argv[]) {
         return 1; // Exit if write fails
     }
 
-    printf("Password updated successfully\n");
+    write(STDOUT_FILENO, "Password updated successfully\n", 30);
     
     // Unlock the whole file before executing admin actions
     struct flock unlock;

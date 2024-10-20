@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include "../global.c"
 #include <sodium.h> // Required for crypto_pwhash_STRBYTES
 
@@ -17,7 +18,6 @@ struct Operation {
     char username[20];  // Current username of the customer
 };
 
-
 // Structure for customer login details
 struct CustomerLogin {
     char username[20];                         // Username of the customer
@@ -29,9 +29,9 @@ int update_customer_login(const char *current_username, const char *new_username
     char CustomerLoginsPath[256];
     snprintf(CustomerLoginsPath, sizeof(CustomerLoginsPath), "%s%s", basePath, "/customer/customerlogins.txt");
 
-    FILE *customer_file = fopen(CustomerLoginsPath, "rb+");
-    if (customer_file == NULL) {
-        perror("fopen customers.txt");
+    int customer_file = open(CustomerLoginsPath, O_RDWR);
+    if (customer_file == -1) {
+        perror("open customers.txt");
         return -1;
     }
 
@@ -39,7 +39,7 @@ int update_customer_login(const char *current_username, const char *new_username
     int user_found = 0;
 
     // Find the current user in customers.txt
-    while (fread(&customer, sizeof(struct CustomerLogin), 1, customer_file) == 1) {
+    while (read(customer_file, &customer, sizeof(struct CustomerLogin)) == sizeof(struct CustomerLogin)) {
         if (strcmp(customer.username, current_username) == 0) {
             user_found = 1;
             break;
@@ -47,18 +47,18 @@ int update_customer_login(const char *current_username, const char *new_username
     }
 
     if (!user_found) {
-        fclose(customer_file);
+        close(customer_file);
         return -1;  // User not found
     }
 
     // Update the username in customers.txt
-    fseek(customer_file, -sizeof(struct CustomerLogin), SEEK_CUR);  // Move back to the current record
+    lseek(customer_file, -sizeof(struct CustomerLogin), SEEK_CUR);  // Move back to the current record
     strncpy(customer.username, new_username, sizeof(customer.username) - 1);
     customer.username[sizeof(customer.username) - 1] = '\0';  // Null-terminate
-    fwrite(&customer, sizeof(struct CustomerLogin), 1, customer_file);
-    fflush(customer_file);  // Ensure changes are written to the file
+    write(customer_file, &customer, sizeof(struct CustomerLogin));
+    fsync(customer_file);  // Ensure changes are written to the file
 
-    fclose(customer_file);
+    close(customer_file);
     return 0;  // Success
 }
 

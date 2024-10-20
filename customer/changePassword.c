@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
 
     printf("Welcome to cashflow, dear customer\n");
     printf("Please login below to proceed further\n");
-    char *username = argv[0]; // Change argv[0] to argv[1] for username
+    char *username = argv[1]; // Change argv[0] to argv[1] for username
     printf("Hello %s\n", username);
 
     // Search for the user in the file

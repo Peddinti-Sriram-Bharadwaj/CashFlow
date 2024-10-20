@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include "../global.c"
 
 #define SOCKET_PATH "/tmp/server"
@@ -17,13 +18,27 @@ struct Operation {
     } data;
 };
 
+void safe_write(int fd, const char *str) {
+    write(fd, str, strlen(str));
+}
+
+void safe_read(int fd, char *buffer, size_t size) {
+    ssize_t num_bytes = read(fd, buffer, size - 1);
+    if (num_bytes == -1) {
+        perror("read");
+        exit(1);
+    }
+    buffer[num_bytes] = '\0'; // Null-terminate
+}
+
 int main(int argc, char *argv[]) {
     char CustomerActionsPath[256];
     snprintf(CustomerActionsPath, sizeof(CustomerActionsPath), "%s%s", basePath, "/customer/customer.out");
 
     char *username = argv[0]; // Use the first argument as the username
-    printf("This is the username: %s\n", username);
-    fflush(stdout); // Ensure output is printed immediately
+    safe_write(STDOUT_FILENO, "This is the username: ");
+    safe_write(STDOUT_FILENO, username);
+    safe_write(STDOUT_FILENO, "\n");
 
     int sockfd;
     struct sockaddr_un server_addr;
@@ -63,21 +78,23 @@ int main(int argc, char *argv[]) {
 
     // Receive the "feedback" prompt message from the server
     char server_message[BUFFER_SIZE];
-    num_bytes = recv(sockfd, server_message, sizeof(server_message) - 1, 0);
-    if (num_bytes == -1) {
-        perror("recv");
-        close(sockfd);
-        exit(1);
-    }
-    server_message[num_bytes] = '\0'; // Null-terminate
+    safe_read(sockfd, server_message, sizeof(server_message));
 
     // Check if server requests feedback
     if (strcmp(server_message, "feedback") == 0) {
         // Prompt the user for feedback
         char feedback[101]; // Buffer for feedback (100 chars + null terminator)
-        printf("Enter your feedback (max 100 characters): ");
-        fgets(feedback, sizeof(feedback), stdin);
+        safe_write(STDOUT_FILENO, "Enter your feedback (max 100 characters): ");
         
+        // Read feedback from stdin
+        ssize_t feedback_len = read(STDIN_FILENO, feedback, sizeof(feedback) - 1);
+        if (feedback_len == -1) {
+            perror("read");
+            close(sockfd);
+            exit(1);
+        }
+        feedback[feedback_len] = '\0'; // Null-terminate
+
         // Remove newline character if present
         feedback[strcspn(feedback, "\n")] = '\0';
 
@@ -100,14 +117,20 @@ int main(int argc, char *argv[]) {
 
         // Print appropriate message based on server response
         if (result == 1) {
-            printf("Feedback submitted successfully for user %s.\n", operation.data.username);
+            safe_write(STDOUT_FILENO, "Feedback submitted successfully for user ");
+            safe_write(STDOUT_FILENO, operation.data.username);
+            safe_write(STDOUT_FILENO, ".\n");
         } else if (result == -1) {
-            printf("Feedback submission failed for user %s.\n", operation.data.username);
+            safe_write(STDOUT_FILENO, "Feedback submission failed for user ");
+            safe_write(STDOUT_FILENO, operation.data.username);
+            safe_write(STDOUT_FILENO, ".\n");
         } else {
-            printf("Unexpected response from server.\n");
+            safe_write(STDOUT_FILENO, "Unexpected response from server.\n");
         }
     } else {
-        printf("Unexpected message from server: %s\n", server_message);
+        safe_write(STDOUT_FILENO, "Unexpected message from server: ");
+        safe_write(STDOUT_FILENO, server_message);
+        safe_write(STDOUT_FILENO, "\n");
     }
 
     // Close the socket

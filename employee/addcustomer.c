@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <stdlib.h>
+#include <errno.h>
 
 #define SOCKET_PATH "/tmp/server"
 #define BUFFER_SIZE 256
@@ -48,6 +49,14 @@ int username_exists(int fd, const char *username) {
     return 0; // Username does not exist
 }
 
+void write_message(const char *msg) {
+    write(STDOUT_FILENO, msg, strlen(msg));
+}
+
+ssize_t read_input(char *buffer, size_t size) {
+    return read(STDIN_FILENO, buffer, size);
+}
+
 int main(int argc, char *argv[]) {
     // Initialize libsodium
     if (sodium_init() < 0) {
@@ -63,7 +72,7 @@ int main(int argc, char *argv[]) {
     // Open the file for reading and writing with a lock
     int fd = open(CustomerLoginsPath, O_RDWR | O_APPEND | O_CREAT, 0644);
     if (fd == -1) {
-        perror("Failed to open customer login file");
+        write_message("Failed to open customer login file\n");
         return 1;
     }
 
@@ -74,9 +83,9 @@ int main(int argc, char *argv[]) {
     lock.l_len = 0;           // Lock the whole file
 
     // Attempt to acquire the write lock
-    printf("Waiting to acquire the lock for writing...\n");
+    write_message("Waiting to acquire the lock for writing...\n");
     if (fcntl(fd, F_SETLKW, &lock) == -1) {
-        perror("fcntl");
+        write_message("Failed to acquire lock\n");
         close(fd);
         return 1; // Lock acquisition failed
     }
@@ -84,15 +93,19 @@ int main(int argc, char *argv[]) {
     struct CustomerLogin e;
     char username[20], password[20];
 
-    printf("Welcome to cashflow, dear customer\n");
-    printf("Please create a new account\n");
-    printf("Enter your username\n");
-    fgets(username, sizeof(username), stdin);
+    write_message("Welcome to cashflow, dear customer\n");
+    write_message("Please create a new account\n");
+    write_message("Enter your username\n");
+
+    if (read_input(username, sizeof(username)) == -1) {
+        write_message("Error reading username\n");
+        return 1;
+    }
     remove_newline(username);
 
     // Check if the username already exists
     if (username_exists(fd, username)) {
-        printf("Username already exists! Please try a different username.\n");
+        write_message("Username already exists! Please try a different username.\n");
         lock.l_type = F_UNLCK; // Unlock
         fcntl(fd, F_SETLK, &lock);
         close(fd);
@@ -100,13 +113,17 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    printf("Enter your password\n");
-    fgets(password, sizeof(password), stdin);
+    write_message("Enter your password\n");
+
+    if (read_input(password, sizeof(password)) == -1) {
+        write_message("Error reading password\n");
+        return 1;
+    }
     remove_newline(password);
 
     // Hash the password
     if (crypto_pwhash_str(e.hashed_password, password, strlen(password), crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
-        printf("Password hashing failed\n");
+        write_message("Password hashing failed\n");
         lock.l_type = F_UNLCK; // Unlock
         fcntl(fd, F_SETLK, &lock);
         close(fd);
@@ -116,16 +133,17 @@ int main(int argc, char *argv[]) {
     // Store the username and hashed password in the file
     strncpy(e.username, username, sizeof(e.username) - 1); // Ensure null-termination
     strncpy(e.loggedin, "n", sizeof(e.loggedin) - 1);
-    
+
     if (write(fd, &e, sizeof(e)) == -1) {
-        perror("Failed to write customer login data");
+        write_message("Failed to write customer login data\n");
         lock.l_type = F_UNLCK; // Unlock
         fcntl(fd, F_SETLK, &lock);
         close(fd);
         return 1; // Error occurred
     }
 
-    printf("Account created successfully\n");
+    write_message("Account created successfully\n");
+
     close(fd);
 
     lock.l_type = F_UNLCK; // Unlock the file
@@ -143,7 +161,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr_un server_addr;
 
     if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-        perror("socket");
+        write_message("Failed to create socket\n");
         exit(1);
     }
 
@@ -153,19 +171,19 @@ int main(int argc, char *argv[]) {
 
     // Connect to the server
     if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
-        perror("connect");
+        write_message("Failed to connect to server\n");
         close(sockfd);
         exit(1);
     }
 
     // Send the operation to the server
     if (send(sockfd, &o, sizeof(o), 0) == -1) {
-        perror("send");
+        write_message("Failed to send data to server\n");
         close(sockfd);
         exit(1);
     }
 
-    printf("Customer data sent to server\n");
+    write_message("Customer data sent to server\n");
 
     // Close the socket
     close(sockfd);

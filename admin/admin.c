@@ -25,59 +25,62 @@ int main(int argc, char *argv[]) {
     char changePasswordPath[256];
     snprintf(changePasswordPath, sizeof(changePasswordPath), "%s%s", basePath, "/admin/changePassword.out");
 
-
-    printf("Welcome to the admin dashboard\n");
-    printf("Hello %s\n", username);
-    printf("Please choose one of the options to proceed further\n");
-    printf("Add new bank employee - 1\n");
-    printf("Add a new Manager - 2\n");
-    printf("Modify customer details -3\n");
-    printf("Manage user roles - 4\n");
-    printf("Change password - 5\n");
-    printf("Logout - 6\n");
-    printf("Exit - 7\n");
+    // Using write system call instead of printf
+    write(STDOUT_FILENO, "Welcome to the admin dashboard\n", 31);
+    write(STDOUT_FILENO, "Hello ", 6);
+    write(STDOUT_FILENO, username, strlen(username));
+    write(STDOUT_FILENO, "\nPlease choose one of the options to proceed further\n", 54);
+    write(STDOUT_FILENO, "Add new bank employee - 1\n", 26);
+    write(STDOUT_FILENO, "Add a new Manager - 2\n", 22);
+    write(STDOUT_FILENO, "Modify customer details -3\n", 27);
+    write(STDOUT_FILENO, "Manage user roles - 4\n", 22);
+    write(STDOUT_FILENO, "Change password - 5\n", 20);
+    write(STDOUT_FILENO, "Logout - 6\n", 11);
+    write(STDOUT_FILENO, "Exit - 7\n", 9);
 
     int option;
-    scanf("%d", &option);
+    char buffer[4];
+    read(STDIN_FILENO, buffer, sizeof(buffer));
+    option = atoi(buffer);
 
     switch(option) {
         case 1:
-            printf("Add new bank employee\n");
+            write(STDOUT_FILENO, "Add new bank employee\n", 22);
             execvp(AddEmployeePath, argv);
             break;
         case 2:
-            printf("Add a new Manager\n");
+            write(STDOUT_FILENO, "Add a new Manager\n", 18);
             execvp(AddManagerPath, argv);
             break;
         case 3:
-            printf("Modify customer details\n");
+            write(STDOUT_FILENO, "Modify customer details\n", 24);
             break;
         case 4:
-            printf("Manage user roles\n");
+            write(STDOUT_FILENO, "Manage user roles\n", 18);
             break;
         case 5:
-            printf("Change password\n");
+            write(STDOUT_FILENO, "Change password\n", 16);
             execvp(changePasswordPath, argv);
             break;
         case 6:
-            printf("Logout\n");
+            write(STDOUT_FILENO, "Logout\n", 7);
             {
                 // Prepare arguments for execvp
                 char *args[] = {username, NULL}; // First element is path, second is username
-                printf("Calling logout...\n");
+                write(STDOUT_FILENO, "Calling logout...\n", 18);
                 execvp(LogOutPath, args); 
                 perror("execvp failed"); // Handle execvp failure
                 return 1; // Exit if execvp fails
             }
             break;
         case 7:
-            printf("Exit\n");
+            write(STDOUT_FILENO, "Exit\n", 5);
             execvp(ExitPath, NULL);
             perror("execvp failed"); // Handle execvp failure
             return 1; // Exit if execvp fails
             break;
         default:
-            printf("Invalid option. Please try again.\n");
+            write(STDOUT_FILENO, "Invalid option. Please try again.\n", 34);
             break;
     }
 

@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include "../global.c"
 
 #define SOCKET_PATH "/tmp/server"
@@ -20,6 +21,16 @@ struct Employee {
     char username[20]; // Employee's username
     char processing_usernames[5][20]; // Up to 5 usernames of customers whose loans are being processed
 };
+
+void write_message(const char *message) {
+    write(STDOUT_FILENO, message, strlen(message));
+}
+
+void write_number(int number) {
+    char buffer[20];
+    int length = snprintf(buffer, sizeof(buffer), "%d", number);
+    write(STDOUT_FILENO, buffer, length);
+}
 
 int main(int argc, char *argv[]) {
     char ManagerActionsPath[256];
@@ -59,28 +70,33 @@ int main(int argc, char *argv[]) {
 
     // Receive the number of employees with "None" in processing_usernames
     int pending_count;
-    num_bytes = recv(sockfd, &pending_count, sizeof(pending_count), 0);
+    num_bytes = read(sockfd, &pending_count, sizeof(pending_count));
     if (num_bytes == -1) {
-        perror("recv");
+        perror("read");
         close(sockfd);
         exit(1);
     }
 
-    printf("Number of employees with at least one 'None': %d\n", pending_count);
+    write_message("Number of employees with at least one 'None': ");
+    write_number(pending_count);
+    write_message("\n");
 
     // Step 4: Receive each employee and display their username
     for (int i = 0; i < pending_count; i++) {
         struct Employee employee;
-        num_bytes = recv(sockfd, &employee, sizeof(struct Employee), 0);
+        num_bytes = read(sockfd, &employee, sizeof(struct Employee));
         if (num_bytes == -1) {
-            perror("recv");
+            perror("read");
             close(sockfd);
             exit(1);
         }
 
         // Display the employee username
-        printf("Employee %d:\n", i + 1);
-        printf("  Username: %s\n", employee.username);
+        write_message("Employee ");
+        write_number(i + 1);
+        write_message(":\n  Username: ");
+        write_message(employee.username);
+        write_message("\n");
 
         // Send acknowledgment to the server
         int ack = 1; // Acknowledgment

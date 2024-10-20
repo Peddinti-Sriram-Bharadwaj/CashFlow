@@ -30,7 +30,7 @@ int acquire_lock(int fd, int type, off_t start, off_t len) {
     lock.l_len = len; // Length of lock (0 for whole file)
 
     while (fcntl(fd, F_SETLK, &lock) == -1) {
-        printf("Lock is currently unavailable. Please wait...\n");
+        write(STDOUT_FILENO, "Lock is currently unavailable. Please wait...\n", 47);
         sleep(1); // Wait for a second before retrying
     }
     return 0; // Return success
@@ -67,10 +67,10 @@ int main() {
     int found = 0;
     char username[50], password[50];
 
-    printf("Welcome to the Employee dashboard\n");
-    printf("Please login to proceed further\n");
-    printf("Enter your username\n");
-    fgets(username, sizeof(username), stdin);
+    write(STDOUT_FILENO, "Welcome to the Employee dashboard\n", 34);
+    write(STDOUT_FILENO, "Please login to proceed further\n", 32);
+    write(STDOUT_FILENO, "Enter your username\n", 21);
+    read(STDIN_FILENO, username, sizeof(username));
     remove_newline(username);
 
     // Search for the employee
@@ -85,7 +85,7 @@ int main() {
 
     // If employee not found, unlock the whole file and exit
     if (!found) {
-        printf("User doesn't exist\n");
+        write(STDOUT_FILENO, "User doesn't exist\n", 19);
         struct flock unlock;
         memset(&unlock, 0, sizeof(unlock));
         unlock.l_type = F_UNLCK; // Unlock the whole file
@@ -96,7 +96,7 @@ int main() {
 
     // Check if the employee is already logged in
     if (strcmp(e.loggedin, "y") == 0) {
-        printf("User already logged in another session\n");
+        write(STDOUT_FILENO, "User already logged in another session\n", 40);
 
         // Unlock the whole file before exiting
         struct flock unlock;
@@ -112,13 +112,13 @@ int main() {
     }
 
     // Prompt for the password
-    printf("Enter your password\n");
-    fgets(password, sizeof(password), stdin);
+    write(STDOUT_FILENO, "Enter your password\n", 20);
+    read(STDIN_FILENO, password, sizeof(password));
     remove_newline(password);
 
     // Verify the password
     if (crypto_pwhash_str_verify(e.hashed_password, password, strlen(password)) != 0) {
-        printf("Invalid password\n");
+        write(STDOUT_FILENO, "Invalid password\n", 17);
         struct flock unlock;
         memset(&unlock, 0, sizeof(unlock));
         unlock.l_type = F_UNLCK; // Unlock the whole file
@@ -126,7 +126,7 @@ int main() {
         close(fd);
         return 0; // Exit if password verification fails
     } else {
-        printf("Login successful\n");
+        write(STDOUT_FILENO, "Login successful\n", 17);
         e.loggedin[0] = 'y'; // Update logged-in status
         e.loggedin[1] = '\0';
 
@@ -152,7 +152,9 @@ int main() {
             return 1; // Exit if write fails
         }
 
-        printf("Updated login status for user: %s\n", e.username);
+        write(STDOUT_FILENO, "Updated login status for user: ", 31);
+        write(STDOUT_FILENO, e.username, strlen(e.username));
+        write(STDOUT_FILENO, "\n", 1);
 
         // Unlock the whole file before executing employee actions
         struct flock unlock;

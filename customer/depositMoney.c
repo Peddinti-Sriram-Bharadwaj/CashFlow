@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include "../global.c"
 
 #define SOCKET_PATH "/tmp/server"
@@ -17,13 +18,25 @@ struct Operation {
     } data;
 };
 
+void write_message(int fd, const char *message) {
+    write(fd, message, strlen(message));
+}
+
+void read_input(int fd, char *buffer, size_t size) {
+    ssize_t num_bytes = read(fd, buffer, size - 1);
+    if (num_bytes > 0) {
+        buffer[num_bytes] = '\0';
+    }
+}
+
 int main(int argc, char *argv[]) {
     char CustomerActionsPath[256];
     snprintf(CustomerActionsPath, sizeof(CustomerActionsPath), "%s%s", basePath, "/customer/customer.out");
 
     char *username = argv[0]; // Use argv[0] as the username
-    printf("This is the username: %s\n", username);
-    fflush(stdout); // Ensure output is printed immediately
+    write_message(STDOUT_FILENO, "This is the username: ");
+    write_message(STDOUT_FILENO, username);
+    write_message(STDOUT_FILENO, "\n");
 
     int sockfd;
     struct sockaddr_un server_addr;
@@ -75,8 +88,11 @@ int main(int argc, char *argv[]) {
     if (strcmp(server_message, "amount") == 0) {
         // Prompt the user for the deposit amount
         int deposit_amount;
-        printf("Enter the deposit amount: ");
-        scanf("%d", &deposit_amount);
+        write_message(STDOUT_FILENO, "Enter the deposit amount: ");
+        
+        char input_buffer[BUFFER_SIZE];
+        read_input(STDIN_FILENO, input_buffer, sizeof(input_buffer));
+        deposit_amount = atoi(input_buffer);
 
         // Send the deposit amount to the server
         num_bytes = send(sockfd, &deposit_amount, sizeof(deposit_amount), 0);
@@ -97,14 +113,20 @@ int main(int argc, char *argv[]) {
 
         // Print appropriate message based on server response
         if (result == 1) {
-            printf("Deposit successful for user %s.\n", operation.data.username);
+            write_message(STDOUT_FILENO, "Deposit successful for user ");
+            write_message(STDOUT_FILENO, operation.data.username);
+            write_message(STDOUT_FILENO, ".\n");
         } else if (result == -1) {
-            printf("Deposit failed for user %s.\n", operation.data.username);
+            write_message(STDOUT_FILENO, "Deposit failed for user ");
+            write_message(STDOUT_FILENO, operation.data.username);
+            write_message(STDOUT_FILENO, ".\n");
         } else {
-            printf("Unexpected response from server.\n");
+            write_message(STDOUT_FILENO, "Unexpected response from server.\n");
         }
     } else {
-        printf("Unexpected message from server: %s\n", server_message);
+        write_message(STDOUT_FILENO, "Unexpected message from server: ");
+        write_message(STDOUT_FILENO, server_message);
+        write_message(STDOUT_FILENO, "\n");
     }
 
     // Close the socket
