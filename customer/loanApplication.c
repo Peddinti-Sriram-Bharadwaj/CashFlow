@@ -36,9 +36,11 @@ int main(int argc, char *argv[]) {
     snprintf(CustomerActionsPath, sizeof(CustomerActionsPath), "%s%s", basePath, "/customer/customer.out");
 
     char *username = argv[0]; // Use argv[0] as the username
+    write_string(STDOUT_FILENO, "==============================\n");
     write_string(STDOUT_FILENO, "This is the username: ");
     write_string(STDOUT_FILENO, username);
     write_string(STDOUT_FILENO, "\n");
+    write_string(STDOUT_FILENO, "==============================\n");
 
     int sockfd;
     struct sockaddr_un server_addr;
@@ -90,6 +92,7 @@ int main(int argc, char *argv[]) {
     if (strcmp(server_message, "amount") == 0) {
         // Prompt the user for the loan amount
         int loan_amount;
+        write_string(STDOUT_FILENO, "==============================\n");
         write_string(STDOUT_FILENO, "Enter the loan amount: ");
         read_int(STDIN_FILENO, &loan_amount);
 
@@ -112,20 +115,28 @@ int main(int argc, char *argv[]) {
 
         // Print appropriate message based on server response
         if (result == 1) {
+            write_string(STDOUT_FILENO, "==============================\n");
             write_string(STDOUT_FILENO, "Loan request successful for user ");
             write_string(STDOUT_FILENO, operation.data.username);
             write_string(STDOUT_FILENO, ".\n");
+            write_string(STDOUT_FILENO, "==============================\n");
         } else if (result == -1) {
+            write_string(STDOUT_FILENO, "==============================\n");
             write_string(STDOUT_FILENO, "Loan request failed for user ");
             write_string(STDOUT_FILENO, operation.data.username);
             write_string(STDOUT_FILENO, ".\n");
+            write_string(STDOUT_FILENO, "==============================\n");
         } else {
+            write_string(STDOUT_FILENO, "==============================\n");
             write_string(STDOUT_FILENO, "Unexpected response from server.\n");
+            write_string(STDOUT_FILENO, "==============================\n");
         }
     } else {
+        write_string(STDOUT_FILENO, "==============================\n");
         write_string(STDOUT_FILENO, "Unexpected message from server: ");
         write_string(STDOUT_FILENO, server_message);
         write_string(STDOUT_FILENO, "\n");
+        write_string(STDOUT_FILENO, "==============================\n");
     }
 
     // Close the socket

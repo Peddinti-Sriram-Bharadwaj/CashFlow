@@ -67,8 +67,11 @@ int main(int argc, char *argv[]) {
     int found = 0;
     char old_password[20], new_password[20], confirm_password[20];
 
+    write(STDOUT_FILENO, "========================================\n", 41);
     write(STDOUT_FILENO, "Welcome to the admin dashboard\n", 31);
+    write(STDOUT_FILENO, "========================================\n", 41);
     write(STDOUT_FILENO, "Please login below to proceed further\n", 39);
+    write(STDOUT_FILENO, "========================================\n", 41);
     char *username = argv[0];
     write(STDOUT_FILENO, "Hello ", 6);
     write(STDOUT_FILENO, username, strlen(username));

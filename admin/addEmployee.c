@@ -52,7 +52,9 @@ void add_employee(int fd, struct EmployeeLogin *e) {
     if (bytes_written != sizeof(*e)) {
         perror("Failed to write employee data");
     } else {
-        printf("Employee added successfully\n");
+        printf("************************************\n");
+        printf("* Employee added successfully      *\n");
+        printf("************************************\n");
     }
 }
 
@@ -68,7 +70,9 @@ int main(int argc, char *argv[]) {
 
     // Initialize libsodium
     if (sodium_init() < 0) {
-        printf("libsodium initialization failed\n");
+        printf("************************************\n");
+        printf("* libsodium initialization failed  *\n");
+        printf("************************************\n");
         execvp(ExitPath, argv); // Go to ExitPath on error
         perror("execvp failed");
         return 1;
@@ -89,7 +93,10 @@ int main(int argc, char *argv[]) {
     lock.l_len = 0;           // Lock the whole file
 
     // Attempt to acquire the write lock
-    printf("Waiting to acquire the lock for writing...\n"); // Print when waiting
+    printf("************************************\n");
+    printf("* Waiting to acquire the lock for  *\n");
+    printf("* writing...                       *\n");
+    printf("************************************\n");
     if (fcntl(fd, F_SETLKW, &lock) == -1) {
         perror("fcntl");
         close(fd);
@@ -99,8 +106,11 @@ int main(int argc, char *argv[]) {
 
     // Ask for username
     char username[20], password[20];
-    printf("Please enter the name of the Employee to be added\n");
-    printf("Enter the username\n");
+    printf("************************************\n");
+    printf("* Please enter the name of the     *\n");
+    printf("* Employee to be added             *\n");
+    printf("************************************\n");
+    printf("Enter the username: ");
     if (read(STDIN_FILENO, username, sizeof(username)) == -1) {
         perror("read");
         lock.l_type = F_UNLCK; // Unlock
@@ -113,7 +123,10 @@ int main(int argc, char *argv[]) {
 
     // Check if the username exists
     if (username_exists(fd, username)) {
-        printf("Username already exists! Redirecting to admin actions...\n");
+        printf("************************************\n");
+        printf("* Username already exists!         *\n");
+        printf("* Redirecting to admin actions...  *\n");
+        printf("************************************\n");
         lock.l_type = F_UNLCK; // Unlock
         fcntl(fd, F_SETLK, &lock);
         close(fd);
@@ -122,7 +135,10 @@ int main(int argc, char *argv[]) {
     }
 
     // Ask the employee to create a password
-    printf("Ask the employee to create a password\n");
+    printf("************************************\n");
+    printf("* Ask the employee to create a     *\n");
+    printf("* password                         *\n");
+    printf("************************************\n");
     if (read(STDIN_FILENO, password, sizeof(password)) == -1) {
         perror("read");
         lock.l_type = F_UNLCK; // Unlock
@@ -140,7 +156,9 @@ int main(int argc, char *argv[]) {
     if (crypto_pwhash_str(e.hashed_password, password, strlen(password), 
                            crypto_pwhash_OPSLIMIT_INTERACTIVE, 
                            crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
-        printf("Error hashing the password\n");
+        printf("************************************\n");
+        printf("* Error hashing the password       *\n");
+        printf("************************************\n");
         lock.l_type = F_UNLCK; // Unlock in case of error
         fcntl(fd, F_SETLK, &lock);
         close(fd);

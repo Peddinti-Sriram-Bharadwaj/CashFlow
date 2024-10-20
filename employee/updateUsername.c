@@ -72,13 +72,17 @@ int main(int argc, char *argv[]) {
     snprintf(EmployeeActionsPath, sizeof(EmployeeActionsPath), "%s%s", basePath, "/employee/employee.out");
 
     char *employee_username = argv[0];  // Use argv[0] as the employee username
+    printf("========================================\n");
     printf("Employee: %s\n", employee_username);
+    printf("========================================\n");
     fflush(stdout);  // Ensure output is printed immediately
 
     // Ask the user for the customer whose username they want to update
     char customer_username[20];
-    printf("Enter the username of the customer whose username you want to update: ");
-    scanf("%19s", customer_username);  // Take input for the current customer username
+    printf("----------------------------------------\n");
+    printf("Enter the username of the customer to update: ");
+    scanf("%19s", customer_username);  // Take input for the customer username
+    printf("----------------------------------------\n");
 
     int sockfd;
     struct sockaddr_un server_addr;

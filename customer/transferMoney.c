@@ -22,7 +22,9 @@ int main(int argc, char *argv[]) {
     snprintf(CustomerActionsPath, sizeof(CustomerActionsPath), "%s%s", basePath, "/customer/customer.out");
 
     char *username = argv[0]; // Use argv[0] as the username
+    printf("========================================\n");
     printf("This is the username: %s\n", username);
+    printf("========================================\n");
     fflush(stdout); // Ensure output is printed immediately
 
     int sockfd;
@@ -75,6 +77,7 @@ int main(int argc, char *argv[]) {
     if (strcmp(server_message, "amount") == 0) {
         // Prompt the user for the transfer amount
         int transfer_amount;
+        printf("========================================\n");
         printf("Enter the amount to transfer: ");
         scanf("%d", &transfer_amount);
 
@@ -119,6 +122,7 @@ int main(int argc, char *argv[]) {
             }
 
             // Print appropriate message based on server response
+            printf("========================================\n");
             if (result == 1) {
                 printf("Transfer successful for user %s.\n", operation.data.username);
             } else if (result == -1) {
@@ -126,6 +130,7 @@ int main(int argc, char *argv[]) {
             } else {
                 printf("Unexpected response from server.\n");
             }
+            printf("========================================\n");
         } else {
             printf("Unexpected message from server: %s\n", server_message);
         }

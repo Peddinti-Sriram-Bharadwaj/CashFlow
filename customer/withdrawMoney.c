@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
     char *username = argv[0]; // Use argv[0] as the username
 
     char username_message[BUFFER_SIZE];
-    snprintf(username_message, sizeof(username_message), "This is the username: %s\n", username);
+    snprintf(username_message, sizeof(username_message), "=== Username: %s ===\n", username);
     write_message(STDOUT_FILENO, username_message);
 
     int sockfd;
@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
     // Check if server requests the withdrawal amount
     if (strcmp(server_message, "amount") == 0) {
         // Prompt the user for the withdrawal amount
-        write_message(STDOUT_FILENO, "Enter the withdrawal amount: ");
+        write_message(STDOUT_FILENO, "=== Enter the withdrawal amount: ===\n");
         
         char amount_buffer[BUFFER_SIZE];
         read_input(STDIN_FILENO, amount_buffer, sizeof(amount_buffer));
@@ -111,15 +111,15 @@ int main(int argc, char *argv[]) {
 
         // Print appropriate message based on server response
         if (result == 1) {
-            write_message(STDOUT_FILENO, "Withdrawal successful.\n");
+            write_message(STDOUT_FILENO, "=== Withdrawal successful. ===\n");
         } else if (result == -1) {
-            write_message(STDOUT_FILENO, "Withdrawal failed.\n");
+            write_message(STDOUT_FILENO, "=== Withdrawal failed. ===\n");
         } else {
-            write_message(STDOUT_FILENO, "Unexpected response from server.\n");
+            write_message(STDOUT_FILENO, "=== Unexpected response from server. ===\n");
         }
     } else {
         char unexpected_message[BUFFER_SIZE];
-        snprintf(unexpected_message, sizeof(unexpected_message), "Unexpected message from server: %s\n", server_message);
+        snprintf(unexpected_message, sizeof(unexpected_message), "=== Unexpected message from server: %s ===\n", server_message);
         write_message(STDOUT_FILENO, unexpected_message);
     }
 

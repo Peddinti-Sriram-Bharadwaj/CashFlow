@@ -99,9 +99,12 @@ int main() {
     int found = 0;
     char username[20], password[20];
 
+    write(STDOUT_FILENO, "========================================\n", 41);
     write(STDOUT_FILENO, "Welcome to cashflow, dear customer\n", 35);
+    write(STDOUT_FILENO, "========================================\n", 41);
     write(STDOUT_FILENO, "Please login below to proceed further\n", 39);
-    write(STDOUT_FILENO, "Enter your username\n", 21);
+    write(STDOUT_FILENO, "----------------------------------------\n", 41);
+    write(STDOUT_FILENO, "Enter your username: ", 21);
     read(STDIN_FILENO, username, sizeof(username));
     remove_newline(username);
 

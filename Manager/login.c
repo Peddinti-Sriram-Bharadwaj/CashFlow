@@ -105,9 +105,11 @@ int main() {
     char username[50], password[50];
 
     // Ask for username input
+    write(STDOUT_FILENO, "========================================\n", 41);
     write(STDOUT_FILENO, "Welcome to the admin dashboard\n", 31);
     write(STDOUT_FILENO, "Please login to proceed further\n", 32);
-    write(STDOUT_FILENO, "Enter username\n", 15);
+    write(STDOUT_FILENO, "========================================\n", 41);
+    write(STDOUT_FILENO, "Enter username: ", 16);
     read(STDIN_FILENO, username, sizeof(username));
     remove_newline(username);
 
@@ -139,19 +141,19 @@ int main() {
         return 1; // Exit if exec fails
     }
 
-    write(STDOUT_FILENO, "Enter password\n", 15);
+    write(STDOUT_FILENO, "Enter password: ", 16);
     read_password(password, sizeof(password)); // Call the new password read function
 
     // Verify the entered password against the stored hash
     if (crypto_pwhash_str_verify(a.hashed_password, password, strlen(password)) != 0) {
-        write(STDOUT_FILENO, "Invalid password\n", 17);
+        write(STDOUT_FILENO, "\nInvalid password\n", 18);
         unlock_file(fd);
         close(fd);
         execvp(ExitPath, NULL); // Execute exit path
         perror("Failed to execute exit path");
         return 1; // Exit if exec fails
     } else {
-        write(STDOUT_FILENO, "\nLogin successful\n", 17);
+        write(STDOUT_FILENO, "\nLogin successful\n", 18);
         a.loggedin[0] = 'y'; // Update logged-in status
         a.loggedin[1] = '\0';
 

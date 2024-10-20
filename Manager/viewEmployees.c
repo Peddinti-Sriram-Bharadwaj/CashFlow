@@ -77,9 +77,11 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    write_message("========================================\n");
     write_message("Number of employees with at least one 'None': ");
     write_number(pending_count);
     write_message("\n");
+    write_message("========================================\n");
 
     // Step 4: Receive each employee and display their username
     for (int i = 0; i < pending_count; i++) {
@@ -92,11 +94,13 @@ int main(int argc, char *argv[]) {
         }
 
         // Display the employee username
+        write_message("----------------------------------------\n");
         write_message("Employee ");
         write_number(i + 1);
         write_message(":\n  Username: ");
         write_message(employee.username);
         write_message("\n");
+        write_message("----------------------------------------\n");
 
         // Send acknowledgment to the server
         int ack = 1; // Acknowledgment

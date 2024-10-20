@@ -72,7 +72,9 @@ int main(int argc, char *argv[]) {
     // Open the file for reading and writing with a lock
     int fd = open(CustomerLoginsPath, O_RDWR | O_APPEND | O_CREAT, 0644);
     if (fd == -1) {
+        write_message("========================================\n");
         write_message("Failed to open customer login file\n");
+        write_message("========================================\n");
         return 1;
     }
 
@@ -83,9 +85,13 @@ int main(int argc, char *argv[]) {
     lock.l_len = 0;           // Lock the whole file
 
     // Attempt to acquire the write lock
+    write_message("========================================\n");
     write_message("Waiting to acquire the lock for writing...\n");
+    write_message("========================================\n");
     if (fcntl(fd, F_SETLKW, &lock) == -1) {
+        write_message("========================================\n");
         write_message("Failed to acquire lock\n");
+        write_message("========================================\n");
         close(fd);
         return 1; // Lock acquisition failed
     }
@@ -93,19 +99,25 @@ int main(int argc, char *argv[]) {
     struct CustomerLogin e;
     char username[20], password[20];
 
+    write_message("========================================\n");
     write_message("Welcome to cashflow, dear customer\n");
     write_message("Please create a new account\n");
     write_message("Enter your username\n");
+    write_message("========================================\n");
 
     if (read_input(username, sizeof(username)) == -1) {
+        write_message("========================================\n");
         write_message("Error reading username\n");
+        write_message("========================================\n");
         return 1;
     }
     remove_newline(username);
 
     // Check if the username already exists
     if (username_exists(fd, username)) {
+        write_message("========================================\n");
         write_message("Username already exists! Please try a different username.\n");
+        write_message("========================================\n");
         lock.l_type = F_UNLCK; // Unlock
         fcntl(fd, F_SETLK, &lock);
         close(fd);
@@ -113,17 +125,23 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    write_message("========================================\n");
     write_message("Enter your password\n");
+    write_message("========================================\n");
 
     if (read_input(password, sizeof(password)) == -1) {
+        write_message("========================================\n");
         write_message("Error reading password\n");
+        write_message("========================================\n");
         return 1;
     }
     remove_newline(password);
 
     // Hash the password
     if (crypto_pwhash_str(e.hashed_password, password, strlen(password), crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
+        write_message("========================================\n");
         write_message("Password hashing failed\n");
+        write_message("========================================\n");
         lock.l_type = F_UNLCK; // Unlock
         fcntl(fd, F_SETLK, &lock);
         close(fd);
@@ -135,14 +153,18 @@ int main(int argc, char *argv[]) {
     strncpy(e.loggedin, "n", sizeof(e.loggedin) - 1);
 
     if (write(fd, &e, sizeof(e)) == -1) {
+        write_message("========================================\n");
         write_message("Failed to write customer login data\n");
+        write_message("========================================\n");
         lock.l_type = F_UNLCK; // Unlock
         fcntl(fd, F_SETLK, &lock);
         close(fd);
         return 1; // Error occurred
     }
 
+    write_message("========================================\n");
     write_message("Account created successfully\n");
+    write_message("========================================\n");
 
     close(fd);
 
@@ -161,7 +183,9 @@ int main(int argc, char *argv[]) {
     struct sockaddr_un server_addr;
 
     if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+        write_message("========================================\n");
         write_message("Failed to create socket\n");
+        write_message("========================================\n");
         exit(1);
     }
 
@@ -171,19 +195,25 @@ int main(int argc, char *argv[]) {
 
     // Connect to the server
     if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
+        write_message("========================================\n");
         write_message("Failed to connect to server\n");
+        write_message("========================================\n");
         close(sockfd);
         exit(1);
     }
 
     // Send the operation to the server
     if (send(sockfd, &o, sizeof(o), 0) == -1) {
+        write_message("========================================\n");
         write_message("Failed to send data to server\n");
+        write_message("========================================\n");
         close(sockfd);
         exit(1);
     }
 
+    write_message("========================================\n");
     write_message("Customer data sent to server\n");
+    write_message("========================================\n");
 
     // Close the socket
     close(sockfd);

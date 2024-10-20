@@ -26,17 +26,21 @@ int main(int argc, char *argv[]) {
     snprintf(changePasswordPath, sizeof(changePasswordPath), "%s%s", basePath, "/admin/changePassword.out");
 
     // Using write system call instead of printf
+    write(STDOUT_FILENO, "========================================\n", 41);
     write(STDOUT_FILENO, "Welcome to the admin dashboard\n", 31);
+    write(STDOUT_FILENO, "========================================\n", 41);
     write(STDOUT_FILENO, "Hello ", 6);
     write(STDOUT_FILENO, username, strlen(username));
-    write(STDOUT_FILENO, "\nPlease choose one of the options to proceed further\n", 54);
-    write(STDOUT_FILENO, "Add new bank employee - 1\n", 26);
-    write(STDOUT_FILENO, "Add a new Manager - 2\n", 22);
-    write(STDOUT_FILENO, "Modify customer details -3\n", 27);
-    write(STDOUT_FILENO, "Manage user roles - 4\n", 22);
-    write(STDOUT_FILENO, "Change password - 5\n", 20);
-    write(STDOUT_FILENO, "Logout - 6\n", 11);
-    write(STDOUT_FILENO, "Exit - 7\n", 9);
+    write(STDOUT_FILENO, "\n========================================\n", 42);
+    write(STDOUT_FILENO, "Please choose one of the options to proceed further\n", 54);
+    write(STDOUT_FILENO, "========================================\n", 41);
+    write(STDOUT_FILENO, "1. Add new bank employee\n", 25);
+    write(STDOUT_FILENO, "2. Add a new Manager\n", 21);
+    write(STDOUT_FILENO, "3. Modify customer details\n", 27);
+    write(STDOUT_FILENO, "4. Manage user roles\n", 21);
+    write(STDOUT_FILENO, "5. Change password\n", 19);
+    write(STDOUT_FILENO, "6. Logout\n", 10);
+    write(STDOUT_FILENO, "========================================\n", 41);
 
     int option;
     char buffer[4];
@@ -72,12 +76,6 @@ int main(int argc, char *argv[]) {
                 perror("execvp failed"); // Handle execvp failure
                 return 1; // Exit if execvp fails
             }
-            break;
-        case 7:
-            write(STDOUT_FILENO, "Exit\n", 5);
-            execvp(ExitPath, NULL);
-            perror("execvp failed"); // Handle execvp failure
-            return 1; // Exit if execvp fails
             break;
         default:
             write(STDOUT_FILENO, "Invalid option. Please try again.\n", 34);

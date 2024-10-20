@@ -86,7 +86,9 @@ int main(int argc, char *argv[]) {
     lock.l_len = 0;           // Lock the whole file
 
     // Attempt to acquire the write lock
+    write(STDOUT_FILENO, "========================================\n", 42);
     write(STDOUT_FILENO, "Waiting to acquire the lock for writing...\n", 43);
+    write(STDOUT_FILENO, "========================================\n", 42);
     if (fcntl(fd, F_SETLKW, &lock) == -1) {
         perror("fcntl");
         close(fd);
@@ -96,14 +98,18 @@ int main(int argc, char *argv[]) {
 
     // Ask for username
     char username[20], password[20];
+    write(STDOUT_FILENO, "========================================\n", 42);
     write(STDOUT_FILENO, "Please enter the name of the Manager to be added\n", 50);
     write(STDOUT_FILENO, "Enter the username\n", 19);
+    write(STDOUT_FILENO, "========================================\n", 42);
     read(STDIN_FILENO, username, sizeof(username));
     remove_newline(username);
 
     // Check if the username exists
     if (username_exists(fd, username)) {
+        write(STDOUT_FILENO, "========================================\n", 42);
         write(STDOUT_FILENO, "Username already exists! Redirecting to admin actions...\n", 58);
+        write(STDOUT_FILENO, "========================================\n", 42);
         lock.l_type = F_UNLCK; // Unlock
         fcntl(fd, F_SETLK, &lock);
         close(fd);
@@ -112,7 +118,9 @@ int main(int argc, char *argv[]) {
     }
 
     // Ask the manager to create a password
+    write(STDOUT_FILENO, "========================================\n", 42);
     write(STDOUT_FILENO, "Ask the Manager to create a password\n", 37);
+    write(STDOUT_FILENO, "========================================\n", 42);
     read(STDIN_FILENO, password, sizeof(password));
     remove_newline(password);
 
@@ -124,7 +132,9 @@ int main(int argc, char *argv[]) {
     if (crypto_pwhash_str(m.hashed_password, password, strlen(password), 
                            crypto_pwhash_OPSLIMIT_INTERACTIVE, 
                            crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
+        write(STDOUT_FILENO, "========================================\n", 42);
         write(STDOUT_FILENO, "Error hashing the password\n", 27);
+        write(STDOUT_FILENO, "========================================\n", 42);
         lock.l_type = F_UNLCK; // Unlock in case of error
         fcntl(fd, F_SETLK, &lock);
         close(fd);

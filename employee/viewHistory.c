@@ -136,9 +136,11 @@ int main(int argc, char *argv[]) {
         write_string(STDOUT_FILENO, customer_username);
         write_string(STDOUT_FILENO, ".\n");
     } else {
+        write_string(STDOUT_FILENO, "========================================\n");
         write_string(STDOUT_FILENO, "Transaction History for user ");
         write_string(STDOUT_FILENO, customer_username);
         write_string(STDOUT_FILENO, ":\n");
+        write_string(STDOUT_FILENO, "========================================\n");
         for (int i = 0; i < passbook.num_transactions; i++) {
             char buffer[BUFFER_SIZE];
             snprintf(buffer, sizeof(buffer), "Transaction %d:\n  Type: %s\n  Amount: %d\n  Date: %s\n", 
@@ -149,7 +151,7 @@ int main(int argc, char *argv[]) {
                          passbook.transactions[i].from_username, passbook.transactions[i].to_username);
                 write_string(STDOUT_FILENO, buffer);
             }
-            write_string(STDOUT_FILENO, "\n");
+            write_string(STDOUT_FILENO, "----------------------------------------\n");
         }
     }
 

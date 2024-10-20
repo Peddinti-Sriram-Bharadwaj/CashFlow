@@ -8,13 +8,16 @@ void* run_cashflow_service(void* arg) {
     pthread_t thread_id = pthread_self();
     printf("Thread ID: %lu\n", (unsigned long)thread_id); // Print the thread ID
 
-    printf("Welcome to CashFlow banking services.\n");
-    printf("Please choose one of the following options to continue.\n");
-    printf("Admin - 1\n");
-    printf("Manager - 2\n");
-    printf("Employee - 3\n");
-    printf("Customer - 4\n");
-    printf("exit - 5\n");
+    printf("\n========================================\n");
+    printf("  Welcome to CashFlow Banking Services\n");
+    printf("========================================\n");
+    printf("Please choose one of the following options to continue:\n");
+    printf("  1. Admin\n");
+    printf("  2. Manager\n");
+    printf("  3. Employee\n");
+    printf("  4. Customer\n");
+    printf("  5. Exit\n");
+    printf("========================================\n");
 
     int option;
     scanf("%d", &option);

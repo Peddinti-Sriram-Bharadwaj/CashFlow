@@ -36,9 +36,10 @@ int main(int argc, char *argv[]) {
     snprintf(CustomerActionsPath, sizeof(CustomerActionsPath), "%s%s", basePath, "/customer/customer.out");
 
     char *username = argv[0]; // Use the first argument as the username
+    safe_write(STDOUT_FILENO, "==============================\n");
     safe_write(STDOUT_FILENO, "This is the username: ");
     safe_write(STDOUT_FILENO, username);
-    safe_write(STDOUT_FILENO, "\n");
+    safe_write(STDOUT_FILENO, "\n==============================\n");
 
     int sockfd;
     struct sockaddr_un server_addr;
@@ -117,20 +118,25 @@ int main(int argc, char *argv[]) {
 
         // Print appropriate message based on server response
         if (result == 1) {
+            safe_write(STDOUT_FILENO, "==============================\n");
             safe_write(STDOUT_FILENO, "Feedback submitted successfully for user ");
             safe_write(STDOUT_FILENO, operation.data.username);
-            safe_write(STDOUT_FILENO, ".\n");
+            safe_write(STDOUT_FILENO, ".\n==============================\n");
         } else if (result == -1) {
+            safe_write(STDOUT_FILENO, "==============================\n");
             safe_write(STDOUT_FILENO, "Feedback submission failed for user ");
             safe_write(STDOUT_FILENO, operation.data.username);
-            safe_write(STDOUT_FILENO, ".\n");
+            safe_write(STDOUT_FILENO, ".\n==============================\n");
         } else {
+            safe_write(STDOUT_FILENO, "==============================\n");
             safe_write(STDOUT_FILENO, "Unexpected response from server.\n");
+            safe_write(STDOUT_FILENO, "==============================\n");
         }
     } else {
+        safe_write(STDOUT_FILENO, "==============================\n");
         safe_write(STDOUT_FILENO, "Unexpected message from server: ");
         safe_write(STDOUT_FILENO, server_message);
-        safe_write(STDOUT_FILENO, "\n");
+        safe_write(STDOUT_FILENO, "\n==============================\n");
     }
 
     // Close the socket

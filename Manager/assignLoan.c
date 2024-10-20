@@ -82,6 +82,7 @@ int main(int argc, char *argv[]) {
 
     if (strcmp(buffer, "applicant") == 0) {
         // Ask the user to input loan applicant username
+        safe_write(STDOUT_FILENO, "----------------------------------------\n", 41);
         safe_write(STDOUT_FILENO, "Enter the loan applicant username: ", 35);
         num_bytes = safe_read(STDIN_FILENO, operation.data.username, sizeof(operation.data.username));
         if (num_bytes == -1) {
@@ -110,6 +111,7 @@ int main(int argc, char *argv[]) {
 
     if (strcmp(buffer, "employee") == 0) {
         // Ask the user to input employee username
+        safe_write(STDOUT_FILENO, "----------------------------------------\n", 41);
         safe_write(STDOUT_FILENO, "Enter the employee username: ", 29);
         num_bytes = safe_read(STDIN_FILENO, operation.data.username, sizeof(operation.data.username));
         if (num_bytes == -1) {
@@ -138,9 +140,10 @@ int main(int argc, char *argv[]) {
     }
 
     // Display the assignment result
+    safe_write(STDOUT_FILENO, "----------------------------------------\n", 41);
     safe_write(STDOUT_FILENO, "Assignment result: ", 19);
     safe_write(STDOUT_FILENO, assignment_status, num_bytes);
-    safe_write(STDOUT_FILENO, "\n", 1);
+    safe_write(STDOUT_FILENO, "\n----------------------------------------\n", 42);
 
     // Close the socket and exit
     close(sockfd);

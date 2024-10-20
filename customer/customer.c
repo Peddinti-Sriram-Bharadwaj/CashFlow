@@ -46,20 +46,22 @@ int main(int argc, char *argv[]) {
     char feedbackPath[BUFFER_SIZE];
     snprintf(feedbackPath, sizeof(feedbackPath), "%s%s", basePath, "/customer/feedback.out");
 
-    print_message("welcome to Cashflow dear user\n");
+    print_message("========================================\n");
+    print_message("Welcome to Cashflow dear user\n");
     print_message("Hello ");
     print_message(username);
-    print_message("\nplease select one of the below options to proceed further\n");
-    print_message("View account balance -1\n");
-    print_message("Deposit money -2\n");
-    print_message("Withdraw money -3\n");
-    print_message("Transfer funds -4\n");
-    print_message("Apply for a loan -5\n");
-    print_message("Change password -6\n");
-    print_message("Adding feedback -7\n");
-    print_message("View Transaction History -8\n");
-    print_message("Logout -9\n");
-    print_message("Exit -10\n");
+    print_message("\nPlease select one of the below options to proceed further\n");
+    print_message("========================================\n");
+    print_message("1. View account balance\n");
+    print_message("2. Deposit money\n");
+    print_message("3. Withdraw money\n");
+    print_message("4. Transfer funds\n");
+    print_message("5. Apply for a loan\n");
+    print_message("6. Change password\n");
+    print_message("7. Adding feedback\n");
+    print_message("8. View Transaction History\n");
+    print_message("9. Logout\n");
+    print_message("========================================\n");
 
     char buffer[BUFFER_SIZE];
     int bytes_read = read(STDIN_FILENO, buffer, BUFFER_SIZE);
@@ -107,10 +109,6 @@ int main(int argc, char *argv[]) {
             print_message("Logout\n");
             char *args[] = {username, NULL};
             execvp(LogOutPath, args);
-            break;
-        case 10:
-            print_message("Exit\n");
-            execvp(ExitPath, NULL);
             break;
         default:
             print_message("Invalid option\n");

@@ -34,18 +34,21 @@ int main(int argc, char* argv[]) {
 
   char* username = argv[0];
 
+  write_message("========================================\n");
   write_message("Welcome to the admin dashboard\n");
+  write_message("========================================\n");
   write_message("Hello ");
   write_message(username);
   write_message("\nPlease choose one of the below to proceed further\n");
-  write_message("Activate/deactivate customer accounts -1\n");
-  write_message("View Pending loan applications -2\n");
-  write_message("View employees available for loan application processing -3\n");
-  write_message("Assign loan application processes to employees -4\n");
-  write_message("Review customer feedback -5\n");
-  write_message("Change password -6\n");
-  write_message("Logout -7\n");
-  write_message("Exit -8\n");
+  write_message("----------------------------------------\n");
+  write_message("1. Activate/deactivate customer accounts\n");
+  write_message("2. View Pending loan applications\n");
+  write_message("3. View employees available for loan application processing\n");
+  write_message("4. Assign loan application processes to employees\n");
+  write_message("5. Review customer feedback\n");
+  write_message("6. Change password\n");
+  write_message("7. Logout\n");
+  write_message("----------------------------------------\n");
 
   char buffer[BUFFER_SIZE];
   int option;
@@ -84,10 +87,6 @@ int main(int argc, char* argv[]) {
     case 7:
       write_message("Logout\n");
       execvp(LogOutPath, argv);
-      break;
-    case 8:
-      write_message("Exit\n");
-      execvp(ExitPath, NULL);
       break;
     default:
       write_message("invalid option\n");

@@ -94,6 +94,7 @@ int main(int argc, char *argv[]) {
     } else {
         snprintf(message, sizeof(message), "Transaction History for user %s:\n", username);
         write_message(message);
+        write_message("========================================\n");
         for (int i = 0; i < passbook.num_transactions; i++) {
             snprintf(message, sizeof(message), "Transaction %d:\n", i + 1);
             write_message(message);
@@ -103,14 +104,15 @@ int main(int argc, char *argv[]) {
             write_message(message);
             snprintf(message, sizeof(message), "  Date: %s\n", passbook.transactions[i].date);
             write_message(message);
-            if (strcmp(passbook.transactions[i].type, "Deposit") != 0 || strcmp(passbook.transactions[i].type, "Withdrawal") != 0) {
+            if (strcmp(passbook.transactions[i].type, "Deposit") != 0 && strcmp(passbook.transactions[i].type, "Withdrawal") != 0) {
                 snprintf(message, sizeof(message), "  From: %s\n", passbook.transactions[i].from_username);
                 write_message(message);
                 snprintf(message, sizeof(message), "  To: %s\n", passbook.transactions[i].to_username);
                 write_message(message);
             }
-            write_message("\n");
+            write_message("----------------------------------------\n");
         }
+        write_message("========================================\n");
     }
 
     // Close the socket

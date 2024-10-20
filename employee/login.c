@@ -106,9 +106,11 @@ int main() {
     int found = 0;
     char username[50], password[50];
 
+    write(STDOUT_FILENO, "========================================\n", 41);
     write(STDOUT_FILENO, "Welcome to the Employee dashboard\n", 34);
     write(STDOUT_FILENO, "Please login to proceed further\n", 32);
-    write(STDOUT_FILENO, "Enter your username\n", 21);
+    write(STDOUT_FILENO, "========================================\n", 41);
+    write(STDOUT_FILENO, "Enter your username: ", 21);
     read(STDIN_FILENO, username, sizeof(username));
     remove_newline(username);
 
@@ -124,14 +126,18 @@ int main() {
 
     // If employee not found, unlock the whole file and exit
     if (!found) {
+        write(STDOUT_FILENO, "========================================\n", 41);
         write(STDOUT_FILENO, "User doesn't exist\n", 19);
+        write(STDOUT_FILENO, "========================================\n", 41);
         unlock_and_close(fd);
         return 0; // Exit if user not found
     }
 
     // Check if the employee is already logged in
     if (strcmp(e.loggedin, "y") == 0) {
+        write(STDOUT_FILENO, "========================================\n", 41);
         write(STDOUT_FILENO, "User already logged in another session\n", 40);
+        write(STDOUT_FILENO, "========================================\n", 41);
         unlock_and_close(fd);
         execvp(ExitPath, NULL); // Execute exit path
         perror("Failed to execute exit path");
@@ -139,16 +145,20 @@ int main() {
     }
 
     // Prompt for the password
-    write(STDOUT_FILENO, "Enter your password\n", 20);
+    write(STDOUT_FILENO, "Enter your password: ", 20);
     read_password(password, sizeof(password)); // Securely read password
 
     // Verify the password
     if (crypto_pwhash_str_verify(e.hashed_password, password, strlen(password)) != 0) {
+        write(STDOUT_FILENO, "========================================\n", 41);
         write(STDOUT_FILENO, "Invalid password\n", 17);
+        write(STDOUT_FILENO, "========================================\n", 41);
         unlock_and_close(fd); // Unlock and close if password verification fails
         return 0; // Exit if password verification fails
     } else {
+        write(STDOUT_FILENO, "========================================\n", 41);
         write(STDOUT_FILENO, "Login successful\n", 17);
+        write(STDOUT_FILENO, "========================================\n", 41);
         e.loggedin[0] = 'y'; // Update logged-in status
         e.loggedin[1] = '\0';
 

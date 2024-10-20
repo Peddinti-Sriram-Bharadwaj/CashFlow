@@ -67,7 +67,9 @@ int main(int argc, char *argv[]) {
     int found = 0;
     char old_password[20], new_password[20], confirm_password[20];
 
+    printf("========================================\n");
     printf("Welcome to the employee dashboard\n");
+    printf("========================================\n");
     printf("Please login below to proceed further\n");
     char *username = argv[0];
     printf("Hello %s\n", username);
@@ -169,7 +171,9 @@ int main(int argc, char *argv[]) {
         return 1; // Exit if write fails
     }
 
+    printf("========================================\n");
     printf("Password updated successfully\n");
+    printf("========================================\n");
     
     // Unlock the whole file before executing employee actions
     struct flock unlock;

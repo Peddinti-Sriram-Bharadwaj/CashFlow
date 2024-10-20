@@ -23,7 +23,7 @@ struct LoanApprovalRequest {
 };
 
 int main(int argc, char *argv[]) {
-    printf("here\n");
+    printf("========== Start of Program ==========\n");
     char EmployeeActionsPath[256];
     snprintf(EmployeeActionsPath, sizeof(EmployeeActionsPath), "%s%s", basePath, "/employee/employee.out");
     int sockfd;
@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
     // Get the employee username from command-line arguments
     strcpy(operation.data.username, argv[0]);
     strcpy(operation.operation, "loanApproval"); // Define the operation
-    printf("%s\n",operation.data.username);
+    printf("Employee Username: %s\n", operation.data.username);
 
     // Create a stream socket
     if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
@@ -87,6 +87,7 @@ int main(int argc, char *argv[]) {
 
     // Close the socket
     close(sockfd);
+    printf("========== End of Program ==========\n");
     execvp(EmployeeActionsPath, argv);
     return 0;
 }

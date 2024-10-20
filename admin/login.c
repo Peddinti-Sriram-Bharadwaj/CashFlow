@@ -91,7 +91,11 @@ int main() {
     char username[50], password[50];
     off_t user_position = -1; // To track the position of the found user
 
-    const char *welcome_msg = "Welcome to the admin dashboard\nPlease login to proceed further\nEnter username\n";
+    const char *welcome_msg = "****************************************\n"
+                              "* Welcome to the admin dashboard       *\n"
+                              "****************************************\n"
+                              "Please login to proceed further\n"
+                              "Enter username: ";
     write(STDOUT_FILENO, welcome_msg, strlen(welcome_msg));
     read(STDIN_FILENO, username, sizeof(username));
     remove_newline(username);
@@ -108,7 +112,9 @@ int main() {
 
     // If user not found, unlock the whole file and exit
     if (!found) {
-        const char *msg = "User doesn't exist\n";
+        const char *msg = "****************************************\n"
+                          "* User doesn't exist                   *\n"
+                          "****************************************\n";
         write(STDOUT_FILENO, msg, strlen(msg));
         struct flock unlock;
         memset(&unlock, 0, sizeof(unlock));
@@ -126,7 +132,9 @@ int main() {
 
     // Lock the specific user record for the found user
     if (acquire_lock(fd, F_WRLCK, user_position, sizeof(a)) == -1) {
-        const char *msg = "Failed to lock user record\n";
+        const char *msg = "****************************************\n"
+                          "* Failed to lock user record           *\n"
+                          "****************************************\n";
         write(STDOUT_FILENO, msg, strlen(msg));
         close(fd);
         execl(ExitPath, ExitPath, (char *)NULL); // Exit if lock acquisition fails
@@ -134,7 +142,9 @@ int main() {
 
     // Check if the user is already logged in
     if (strcmp(a.loggedin, "y") == 0) {
-        const char *msg = "User is already logged in one session\n";
+        const char *msg = "****************************************\n"
+                          "* User is already logged in one session*\n"
+                          "****************************************\n";
         write(STDOUT_FILENO, msg, strlen(msg));
         // Unlock the specific record before executing the admin actions
         struct flock unlock;
@@ -149,13 +159,15 @@ int main() {
     }
 
     // Prompt for the password if the user is not logged in
-    const char *password_msg = "Enter the password\n";
+    const char *password_msg = "Enter the password: ";
     write(STDOUT_FILENO, password_msg, strlen(password_msg));
     read_password(password, sizeof(password)); // Use read_password to securely read input
 
     // Verify the password against the stored hash
     if (crypto_pwhash_str_verify(a.hashed_password, password, strlen(password)) != 0) {
-        const char *msg = "Invalid password\n";
+        const char *msg = "****************************************\n"
+                          "* Invalid password                     *\n"
+                          "****************************************\n";
         write(STDOUT_FILENO, msg, strlen(msg));
         // Unlock the specific record before exiting
         struct flock unlock;
@@ -165,7 +177,9 @@ int main() {
         close(fd); // Close the file descriptor
         execl(ExitPath, ExitPath, (char *)NULL); // Exit if password verification fails
     } else {
-        const char *msg = "Login successful\n";
+        const char *msg = "****************************************\n"
+                          "* Login successful                     *\n"
+                          "****************************************\n";
         write(STDOUT_FILENO, msg, strlen(msg));
         a.loggedin[0] = 'y'; // Update logged-in status
         a.loggedin[1] = '\0';
@@ -195,7 +209,9 @@ int main() {
             execl(ExitPath, ExitPath, (char *)NULL); // Exit if write fails
         }
 
-        const char *update_msg = "Updated login status for user: ";
+        const char *update_msg = "****************************************\n"
+                                 "* Updated login status for user:       *\n"
+                                 "****************************************\n";
         write(STDOUT_FILENO, update_msg, strlen(update_msg));
         write(STDOUT_FILENO, a.username, strlen(a.username));
         write(STDOUT_FILENO, "\n", 1);

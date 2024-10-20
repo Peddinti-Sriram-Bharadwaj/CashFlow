@@ -79,8 +79,10 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    write_message(STDOUT_FILENO, "========================================\n");
     write_message(STDOUT_FILENO, "Number of pending loan applications: ");
     write_int(STDOUT_FILENO, pending_count);
+    write_message(STDOUT_FILENO, "========================================\n");
 
     // Step 4: Receive each pending loan application and display it
     for (int i = 0; i < pending_count; i++) {
@@ -94,7 +96,7 @@ int main(int argc, char *argv[]) {
 
         // Display the loan application
         char buffer[BUFFER_SIZE];
-        snprintf(buffer, sizeof(buffer), "Application %d:\n  Username: %s\n  Amount: %d\n  Assigned Employee: %s\n", 
+        snprintf(buffer, sizeof(buffer), "----------------------------------------\nApplication %d:\n  Username: %s\n  Amount: %d\n  Assigned Employee: %s\n----------------------------------------\n", 
                  i + 1, loan_application.username, loan_application.amount, loan_application.assigned_employee);
         write(STDOUT_FILENO, buffer, strlen(buffer));
 

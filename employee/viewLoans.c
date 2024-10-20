@@ -81,11 +81,12 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    write_message(STDOUT_FILENO, "==============================\n");
     write_message(STDOUT_FILENO, "Number of loans assigned to ");
     write_message(STDOUT_FILENO, employee_username);
     write_message(STDOUT_FILENO, ": ");
     write_int(STDOUT_FILENO, loan_count);
-    write_message(STDOUT_FILENO, "\n");
+    write_message(STDOUT_FILENO, "\n==============================\n");
 
     // Step 4: Receive and display each loan's details
     for (int i = 0; i < loan_count; i++) {
@@ -98,6 +99,7 @@ int main(int argc, char *argv[]) {
         }
 
         // Display loan details
+        write_message(STDOUT_FILENO, "------------------------------\n");
         write_message(STDOUT_FILENO, "Loan ");
         write_int(STDOUT_FILENO, i + 1);
         write_message(STDOUT_FILENO, ":\n");
@@ -105,7 +107,7 @@ int main(int argc, char *argv[]) {
         write_message(STDOUT_FILENO, loan_application.username);
         write_message(STDOUT_FILENO, "\n  Amount: ");
         write_int(STDOUT_FILENO, loan_application.amount);
-        write_message(STDOUT_FILENO, "\n");
+        write_message(STDOUT_FILENO, "\n------------------------------\n");
     }
 
     // Close the socket

@@ -23,9 +23,11 @@ int main(int argc, char *argv[]) {
     snprintf(CustomerActionsPath, sizeof(CustomerActionsPath), "%s%s", basePath, "/customer/customer.out");
 
     char *username = argv[0]; // Use the second argument as the username
+    write_message("========================================\n");
     write_message("This is the username: ");
     write(STDOUT_FILENO, username, strlen(username));
     write_message("\n");
+    write_message("========================================\n");
 
     int sockfd;
     struct sockaddr_un server_addr;
@@ -74,12 +76,14 @@ int main(int argc, char *argv[]) {
 
     // Process the balance or user not found error
     if (balance == -1) {
+        write_message("========================================\n");
         write_message("User ");
         write(STDOUT_FILENO, username, strlen(username));
         write_message(" not found.\n");
+        write_message("========================================\n");
     } else {
         char buffer[256];
-        snprintf(buffer, sizeof(buffer), "Balance for user %s: %d\n", username, balance);
+        snprintf(buffer, sizeof(buffer), "========================================\nBalance for user %s: %d\n========================================\n", username, balance);
         write_message(buffer);
     }
 
