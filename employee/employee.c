@@ -36,13 +36,11 @@ int main(int argc, char* argv[]){
   print_message("\nSelect one of the following options to proceed further\n");
   print_message("Add new customer -1\n");
   print_message("Modify customer details -2\n");
-  print_message("Process loan applications -3\n");
   print_message("Approve/reject loan applications -4\n");
   print_message("View assigned loan applications -5\n");
   print_message("View customer transactions -6\n");
   print_message("Change password -7\n");
   print_message("Logout -8\n");
-  print_message("Exit -9\n");
 
   char buffer[4];
   int option;
@@ -57,9 +55,6 @@ int main(int argc, char* argv[]){
     case 2:
       print_message("Modify customer details\n");
       execvp(updateUsernamePath, argv);
-      break;
-    case 3:
-      print_message("Process loan application\n");
       break;
     case 4:
       print_message("Approve/Reject loans\n");
@@ -81,10 +76,6 @@ int main(int argc, char* argv[]){
       print_message("Logout\n");
       char *args[] = {username, NULL};
       execvp(LogOutPath, args);
-      break;
-    case 9:
-      print_message("Exit\n");
-      execvp(ExitPath, NULL);
       break;
     default:
       print_message("Invalid option\n");

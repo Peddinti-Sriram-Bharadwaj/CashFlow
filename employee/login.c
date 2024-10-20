@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <sodium.h> // Include libsodium header
+#include <termios.h> // Include termios for password input
 #include "../global.c"
 
 struct EmployeeLogin {
@@ -13,6 +14,7 @@ struct EmployeeLogin {
     char hashed_password[crypto_pwhash_STRBYTES]; // Store the hashed password
 };
 
+// Function to remove newline character from input
 void remove_newline(char *str) {
     size_t len = strlen(str);
     if (len > 0 && str[len - 1] == '\n') {
@@ -36,9 +38,46 @@ int acquire_lock(int fd, int type, off_t start, off_t len) {
     return 0; // Return success
 }
 
+// Function to unlock the file and close the descriptor
+void unlock_and_close(int fd) {
+    struct flock unlock;
+    memset(&unlock, 0, sizeof(unlock));
+    unlock.l_type = F_UNLCK; // Unlock the whole file
+    fcntl(fd, F_SETLK, &unlock);
+    close(fd);
+}
+
+// Function to read password securely and echo '*' for each character
+void read_password(char *password, size_t size) {
+    struct termios oldt, newt;
+    char ch;
+    size_t i = 0;
+
+    // Get current terminal settings
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ECHO); // Disable echo
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt); // Set new settings
+
+    // Read password and echo '*' for each character
+    while (i < size - 1 && read(STDIN_FILENO, &ch, 1) > 0) {
+        if (ch == '\n' || ch == '\r') {
+            break; // Exit on newline
+        }
+        password[i++] = ch; // Store character in password array
+        write(STDOUT_FILENO, "*", 1); // Echo '*' for the character
+    }
+    password[i] = '\0'; // Null-terminate the password
+
+    // Restore old terminal settings
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    write(STDOUT_FILENO, "\n", 1); // New line after password input
+}
+
 int main() {
     // Initialize libsodium
     if (sodium_init() < 0) {
+        write(STDOUT_FILENO, "Failed to initialize libsodium\n", 32);
         return 1; // Panic! The library couldn't be initialized
     }
 
@@ -59,7 +98,7 @@ int main() {
 
     // Attempt to acquire a write lock on the whole file
     if (acquire_lock(fd, F_WRLCK, 0, 0) == -1) {
-        close(fd);
+        unlock_and_close(fd);
         return 1; // Exit if lock acquisition fails
     }
 
@@ -86,44 +125,27 @@ int main() {
     // If employee not found, unlock the whole file and exit
     if (!found) {
         write(STDOUT_FILENO, "User doesn't exist\n", 19);
-        struct flock unlock;
-        memset(&unlock, 0, sizeof(unlock));
-        unlock.l_type = F_UNLCK; // Unlock the whole file
-        fcntl(fd, F_SETLK, &unlock);
-        close(fd);
+        unlock_and_close(fd);
         return 0; // Exit if user not found
     }
 
     // Check if the employee is already logged in
     if (strcmp(e.loggedin, "y") == 0) {
         write(STDOUT_FILENO, "User already logged in another session\n", 40);
-
-        // Unlock the whole file before exiting
-        struct flock unlock;
-        memset(&unlock, 0, sizeof(unlock));
-        unlock.l_type = F_UNLCK; // Unlock the whole file
-        fcntl(fd, F_SETLK, &unlock);
-        close(fd);
-
-        // Execute the exit path
-        execvp(ExitPath, NULL);
+        unlock_and_close(fd);
+        execvp(ExitPath, NULL); // Execute exit path
         perror("Failed to execute exit path");
         return 1; // Exit if exec fails
     }
 
     // Prompt for the password
     write(STDOUT_FILENO, "Enter your password\n", 20);
-    read(STDIN_FILENO, password, sizeof(password));
-    remove_newline(password);
+    read_password(password, sizeof(password)); // Securely read password
 
     // Verify the password
     if (crypto_pwhash_str_verify(e.hashed_password, password, strlen(password)) != 0) {
         write(STDOUT_FILENO, "Invalid password\n", 17);
-        struct flock unlock;
-        memset(&unlock, 0, sizeof(unlock));
-        unlock.l_type = F_UNLCK; // Unlock the whole file
-        fcntl(fd, F_SETLK, &unlock);
-        close(fd);
+        unlock_and_close(fd); // Unlock and close if password verification fails
         return 0; // Exit if password verification fails
     } else {
         write(STDOUT_FILENO, "Login successful\n", 17);
@@ -133,22 +155,14 @@ int main() {
         // Move the file pointer to the position of the user
         if (lseek(fd, user_position, SEEK_SET) == (off_t)-1) {
             perror("Failed to seek to user position");
-            struct flock unlock;
-            memset(&unlock, 0, sizeof(unlock));
-            unlock.l_type = F_UNLCK; // Unlock the whole file
-            fcntl(fd, F_SETLK, &unlock);
-            close(fd);
+            unlock_and_close(fd); // Unlock and close if seeking fails
             return 1; // Exit if seeking fails
         }
 
         // Write the updated employee login struct
         if (write(fd, &e, sizeof(e)) != sizeof(e)) {
             perror("Failed to write updated login status");
-            struct flock unlock;
-            memset(&unlock, 0, sizeof(unlock));
-            unlock.l_type = F_UNLCK; // Unlock the whole file
-            fcntl(fd, F_SETLK, &unlock);
-            close(fd);
+            unlock_and_close(fd); // Unlock and close if write fails
             return 1; // Exit if write fails
         }
 
@@ -157,11 +171,7 @@ int main() {
         write(STDOUT_FILENO, "\n", 1);
 
         // Unlock the whole file before executing employee actions
-        struct flock unlock;
-        memset(&unlock, 0, sizeof(unlock));
-        unlock.l_type = F_UNLCK; // Unlock the whole file
-        fcntl(fd, F_SETLK, &unlock);
-        close(fd); // Close the file descriptor before executing employee actions
+        unlock_and_close(fd);
 
         // Execute the employee actions
         char *args[] = {username, NULL};
@@ -173,10 +183,6 @@ int main() {
     }
 
     // This line may not be reached if execvp is successful
-    struct flock unlock;
-    memset(&unlock, 0, sizeof(unlock));
-    unlock.l_type = F_UNLCK; // Unlock the whole file
-    fcntl(fd, F_SETLK, &unlock);
-    close(fd);
+    unlock_and_close(fd); // Ensure the file is unlocked and closed
     return 0;
 }

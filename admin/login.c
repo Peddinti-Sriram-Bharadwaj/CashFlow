@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <sodium.h> // Include libsodium header
+#include <termios.h> // Include for termios functionality
 #include "../global.c"
 
 struct AdminLogin {
@@ -36,6 +37,24 @@ int acquire_lock(int fd, int type, off_t start, off_t len) {
         sleep(1); // Wait for a second before retrying
     }
     return 0; // Return success
+}
+
+// Function to securely read a password
+void read_password(char *password, size_t size) {
+    struct termios oldt, newt;
+    
+    // Get the current terminal settings
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt; // Copy current settings
+    newt.c_lflag &= ~(ECHO); // Disable echo
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt); // Set new settings
+    
+    // Read password
+    read(STDIN_FILENO, password, size);
+    remove_newline(password); // Remove newline character
+    
+    // Restore the old terminal settings
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
 }
 
 int main() {
@@ -132,8 +151,7 @@ int main() {
     // Prompt for the password if the user is not logged in
     const char *password_msg = "Enter the password\n";
     write(STDOUT_FILENO, password_msg, strlen(password_msg));
-    read(STDIN_FILENO, password, sizeof(password));
-    remove_newline(password);
+    read_password(password, sizeof(password)); // Use read_password to securely read input
 
     // Verify the password against the stored hash
     if (crypto_pwhash_str_verify(a.hashed_password, password, strlen(password)) != 0) {

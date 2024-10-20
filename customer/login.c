@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <sodium.h> // Include libsodium header
+#include <termios.h> // Include termios for terminal control
 #include "../global.c"
 
 struct CustomerLogin {
@@ -34,6 +35,37 @@ int acquire_lock(int fd, int type, off_t start, off_t len) {
         sleep(1); // Wait for a second before retrying
     }
     return 0; // Return success
+}
+
+// Function to get a masked password
+void get_password(char *password, int max_length) {
+    struct termios oldt, newt;
+
+    // Get the current terminal settings
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+
+    // Disable echoing
+    newt.c_lflag &= ~(ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+
+    printf("Enter your password: ");
+
+    int index = 0;
+    char ch;
+
+    // Read characters one by one
+    while (index < max_length - 1 && (ch = getchar()) != '\n' && ch != EOF) {
+        password[index++] = ch;
+        printf("*"); // Print '*' for each character entered
+        fflush(stdout); // Ensure '*' is printed immediately
+    }
+    password[index] = '\0'; // Null-terminate the password string
+
+    // Restore the old terminal settings
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    
+    printf("\n"); // Move to the next line after password input
 }
 
 int main() {
@@ -113,10 +145,9 @@ int main() {
         return 1; // Exit if exec fails
     }
 
-    write(STDOUT_FILENO, "Enter your password\n", 20);
-    read(STDIN_FILENO, password, sizeof(password));
-    remove_newline(password);
-
+    // Call the function to get the masked password
+    get_password(password, sizeof(password));
+    
     // Verify the password
     if (crypto_pwhash_str_verify(e.hashed_password, password, strlen(password)) != 0) {
         write(STDOUT_FILENO, "Invalid password\n", 17);

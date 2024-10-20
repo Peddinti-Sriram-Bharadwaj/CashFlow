@@ -11,13 +11,6 @@
 #define SOCKET_PATH "/tmp/server"
 #define BUFFER_SIZE 256
 
-pthread_rwlock_t admins_lock = PTHREAD_RWLOCK_INITIALIZER;
-pthread_rwlock_t customers_lock = PTHREAD_RWLOCK_INITIALIZER;
-pthread_rwlock_t employees_lock = PTHREAD_RWLOCK_INITIALIZER;
-pthread_rwlock_t feedbacks_lock = PTHREAD_RWLOCK_INITIALIZER;
-pthread_rwlock_t loanApplications_lock = PTHREAD_RWLOCK_INITIALIZER;
-pthread_rwlock_t managers_lock = PTHREAD_RWLOCK_INITIALIZER;
-pthread_rwlock_t transactions_lock = PTHREAD_RWLOCK_INITIALIZER;
 
 
 struct Customer {
@@ -151,14 +144,11 @@ struct LoanApprovalRequest {
 void *addcustomer(void *arg) {
     struct Customer *customer = (struct Customer *)arg;
 
-    // Lock customers for writing
-    pthread_rwlock_wrlock(&customers_lock);
 
     // Open the customers file for appending (using system call)
     int customer_fd = open("customers.txt", O_WRONLY | O_APPEND | O_CREAT, 0644);
     if (customer_fd == -1) {
         perror("open");
-        pthread_rwlock_unlock(&customers_lock);
         pthread_exit(NULL);
     }
 
@@ -166,23 +156,16 @@ void *addcustomer(void *arg) {
     if (write(customer_fd, customer, sizeof(struct Customer)) == -1) {
         perror("write");
         close(customer_fd);
-        pthread_rwlock_unlock(&customers_lock);
         pthread_exit(NULL);
     }
 
     close(customer_fd);
 
-    // Unlock customers after writing
-    pthread_rwlock_unlock(&customers_lock);
-
-    // Lock transactions for writing
-    pthread_rwlock_wrlock(&transactions_lock);
 
     // Open the transactions file for appending (using system call)
     int passbook_fd = open("transactions.txt", O_WRONLY | O_APPEND | O_CREAT, 0644);
     if (passbook_fd == -1) {
         perror("open");
-        pthread_rwlock_unlock(&transactions_lock);
         pthread_exit(NULL);
     }
 
@@ -195,14 +178,11 @@ void *addcustomer(void *arg) {
     if (write(passbook_fd, &passbook, sizeof(struct Passbook)) == -1) {
         perror("write");
         close(passbook_fd);
-        pthread_rwlock_unlock(&transactions_lock);
         pthread_exit(NULL);
     }
 
     close(passbook_fd);
 
-    // Unlock transactions after writing
-    pthread_rwlock_unlock(&transactions_lock);
 
     pthread_exit(NULL);
 }
@@ -240,20 +220,22 @@ void *addemployee(void *arg) {
         employee->processing_usernames[i][sizeof(employee->processing_usernames[i]) - 1] = '\0'; // Null-terminate
     }
 
-
-    FILE *file = fopen("employees.txt", "ab");
-    if (file == NULL) {
-        perror("fopen");
+    // Open the employees file for appending (using system call)
+    int employee_fd = open("employees.txt", O_WRONLY | O_APPEND | O_CREAT, 0644);
+    if (employee_fd == -1) {
+        perror("open");
         pthread_exit(NULL);
     }
 
-    if (fwrite(employee, sizeof(struct Employee), 1, file) != 1) {
-        perror("fwrite");
-        fclose(file);
+    // Write the employee data to the file (using system call)
+    if (write(employee_fd, employee, sizeof(struct Employee)) == -1) {
+        perror("write");
+        close(employee_fd);
         pthread_exit(NULL);
     }
 
-    fclose(file);
+    close(employee_fd);
+
 
     pthread_exit(NULL);
 }
@@ -262,21 +244,21 @@ void *addemployee(void *arg) {
 void *addmanager(void *arg) {
     struct Manager *manager = (struct Manager *)arg;
 
-
-    FILE *file = fopen("managers.txt", "ab");
-    if (file == NULL) {
-        perror("fopen");
+    // Open the managers file for appending (using system call)
+    int manager_fd = open("managers.txt", O_WRONLY | O_APPEND | O_CREAT, 0644);
+    if (manager_fd == -1) {
+        perror("open");
         pthread_exit(NULL);
     }
 
-    if (fwrite(manager, sizeof(struct Manager), 1, file) != 1) {
-        perror("fwrite");
-        fclose(file);
+    // Write the manager data to the file (using system call)
+    if (write(manager_fd, manager, sizeof(struct Manager)) == -1) {
+        perror("write");
+        close(manager_fd);
         pthread_exit(NULL);
     }
 
-    fclose(file);
-
+    close(manager_fd);
 
     pthread_exit(NULL);
 }
@@ -438,7 +420,6 @@ void *update_username(void *arg) {
         }
     }
 
-    // If user not found, unlock and exit
     if (!user_found) {
         fclose(customer_file);
         pthread_exit(NULL);
