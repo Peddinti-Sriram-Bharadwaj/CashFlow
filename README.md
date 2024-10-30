@@ -1,4 +1,4 @@
-# Cashflow Project README 
+# Cashflow 
 
 ## Project Overview
 **Cashflow** is a robust financial management application built entirely in C, utilizing POSIX threading library, keeping security in mind. Currently, it is supported on macos only.
