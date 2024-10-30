@@ -1,7 +1,7 @@
 # Cashflow Project README
 
 ## Project Overview
-**Cashflow** is a robust financial management application built entirely in C, designed to facilitate secure cash flow tracking and forecasting. The application employs a steel thread approach, ensuring a well-structured and efficient codebase.
+**Cashflow** is a robust financial management application built entirely in C, utilizing POSIX threading library, keeping security in mind.
 
 ## Architecture
 The application is divided into three distinct layers for logical convenience:
@@ -80,7 +80,12 @@ To run the application:
 Notes on Execution
 	•	The application uses `execvp` to run functionalities for different roles, which are located in separate files.
 	•	Ensure that your libsodium installation path matches `/opt/homebrew/Cellar/libsodium/1.0.20/include` for header files and `-L/opt/homebrew/Cellar/libsodium/1.0.20/lib -lsodium` for linking.
-Contributing
+
+## Contributing
+
 Contributions are welcome! If you have suggestions or improvements, please submit a pull request or open an issue for discussion.
-License
+
+
+## License
+
 This project is licensed under the MIT License. For more details, please refer to the LICENSE file in this repository.
