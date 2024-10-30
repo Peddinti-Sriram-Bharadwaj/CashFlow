@@ -24,3 +24,6 @@ changePassword.out: changePassword.c
 
 getFeedback.out: getFeedback.c
 	gcc -o getFeedback.out getFeedback.c
+
+clean:
+	rm -f *.out

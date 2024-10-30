@@ -27,3 +27,5 @@ loan.out : loan.c
 changePassword.out: changePassword.c
 	gcc -o changePassword.out changePassword.c -I/opt/homebrew/Cellar/libsodium/1.0.20/include -L/opt/homebrew/Cellar/libsodium/1.0.20/lib -lsodium
 
+clean:
+	rm -f *.out

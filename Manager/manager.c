@@ -70,6 +70,8 @@ int main(int argc, char* argv[]) {
   switch(option) {
     case 1: 
       write_message("activate/deactivate customer accounts\n");
+      printf("this feature is not implemented yet");
+      execvp(ManagerActionsPath, argv);
       break;
     case 2:
       write_message("view pending loan applications\n");
