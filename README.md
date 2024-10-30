@@ -1,15 +1,13 @@
-# Cashflow Project README
+# Cashflow Project README 
 
 ## Project Overview
-**Cashflow** is a robust financial management application built entirely in C, utilizing POSIX threading library, keeping security in mind.
+**Cashflow** is a robust financial management application built entirely in C, utilizing POSIX threading library, keeping security in mind. Currently, it is supported on macos only.
 
 ## Architecture
 The application is divided into three distinct layers for logical convenience:
 <div style="text-align: center;">
     <img src="https://github.com/user-attachments/assets/b6de2ab6-2f3f-4037-bfae-6147428c7891" alt="Architecture Diagram" height="600">
 </div>
-
-
 
 
 ### 1. Client Side
@@ -65,14 +63,24 @@ cd ../customer && make
 cd ../manager && make
 cd ../employee && make
 ```
+
 Usage
+
 To run the application:
-	1.	Open two terminal windows.
-	2.	In one terminal, navigate to the server directory and run:
+
+1.	head to ./admin folder
+2. 	run the addAdmin.out file
+```bash
+ cd admin && ./addAdmin.out
+```
+4. 	add an admin role
+5.	interrupt the code, and proceed as follows.
+6.	Open two terminal windows.
+7.	In one terminal, navigate to the server directory and run:
  ```bash
  cd server && ./server.out
 ```
-  3.  In another terminal, navigate to the root directory and run:
+  7.  In another terminal, navigate to the root directory and run:
  
  ```bash
  ./welcome.out
