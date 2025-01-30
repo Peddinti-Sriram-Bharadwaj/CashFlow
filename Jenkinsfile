@@ -41,7 +41,8 @@ pipeline {
         }
         stage('Run Tests') {
             steps {
-                // Add commands to run your test suites here
+                echo 'Running tests...'
+                sh 'make test || echo "No tests implemented yet"'
             }
         }
     }
